@@ -1,4 +1,5 @@
 import typer
+import random
 
 from typing import Dict, Any
 from rich.console import Console
@@ -10,7 +11,32 @@ __all__ = [
     "feedback_message",
     "create_table",
     "add_rows_to_table",
+    "random_name"
 ]
+
+# function that creates random names and rturns them
+
+def random_name(num_words: int = 2, separator: str = "_") -> str:
+    adjectives = [
+        "happy", "sunny", "clever", "brave", "calm", "kind", "wise", "proud",
+        "strong", "neat", "soft", "warm", "bright", "cool", "gentle", "sharp",
+        "fresh", "sweet", "wild", "bold"
+    ]
+    
+    nouns = [
+        "apple", "river", "mountain", "forest", "ocean", "star", "moon", "sun",
+        "cloud", "tree", "flower", "bird", "tiger", "lion", "wolf", "bear",
+        "fish", "deer", "fox", "owl"
+    ]
+    
+    words = []
+    for i in range(num_words):
+        if i == num_words - 1:
+            words.append(random.choice(nouns))
+        else:
+            words.append(random.choice(adjectives))
+    
+    return separator.join(words)
 
 
 def feedback_message(message: str, type: str = "info") -> None:

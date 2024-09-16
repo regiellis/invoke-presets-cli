@@ -4,6 +4,7 @@
 .vscode
 .settings.json
 .bash_history
+snapshots/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

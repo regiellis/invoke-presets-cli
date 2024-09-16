@@ -14,7 +14,9 @@ def test_commands(runner, command, args, expected_output):
 
 
 def test_invalid_command(runner):
-    result = runner.invoke(invoke_presets_cli, ["nonexistent-command"], catch_exceptions=False)
+    result = runner.invoke(
+        invoke_presets_cli, ["nonexistent-command"], catch_exceptions=False
+    )
     # print("Command: nonexistent-command")
     # print(f"Exit Code: {result.exit_code}")
     # print(f"Output: {result.stdout}")
