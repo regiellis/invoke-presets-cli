@@ -76,8 +76,8 @@ def load_environment_variables() -> None:
                                searched locations and user chooses not to create one.
     """
     env_locations = [
-        "~/.config/invoke-styles-itsjustregi/.env",
-        "~/.invoke-styles-itsjustregi/.env",
+        "~/.config/invoke-presets-itsjustregi/.env",
+        "~/.invoke-presets-itsjustregi/.env",
         "~/.env",
         "./.env",
     ]
@@ -101,7 +101,7 @@ def load_environment_variables() -> None:
         "Would you like to create a new .env file?", default=True
     )
     if create_new:
-        default_path = Path("~/.config/invoke-styles-itsjustregi/.env").expanduser()
+        default_path = Path("~/.config/invoke-presets-itsjustregi/.env").expanduser()
         questions = [
             inquirer.Path(
                 "env_path",
