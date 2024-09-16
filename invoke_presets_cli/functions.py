@@ -60,8 +60,7 @@ def process_preset_file(file_path: str) -> Dict[str, Any]:
 
 def import_presets() -> None:
     source = inquirer.list_input(
-        "Select import source",
-        choices=["Local File", "URL", "Cancel"]
+        "Select import source", choices=["Local File", "URL", "Cancel"]
     )
 
     if source == "Cancel":
@@ -71,7 +70,7 @@ def import_presets() -> None:
     if source == "Local File":
         file_path = inquirer.text(message="Enter the path to the JSON file")
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 presets_to_import = json.load(f)
         except Exception as e:
             console.print(f"[bold red]Error reading file:[/bold red] {str(e)}")
@@ -87,21 +86,28 @@ def import_presets() -> None:
             return
 
     if not isinstance(presets_to_import, list):
-        console.print("[bold red]Error:[/bold red] Invalid JSON format. Expected a list of presets.")
+        console.print(
+            "[bold red]Error:[/bold red] Invalid JSON format. Expected a list of presets."
+        )
         return
 
     db = get_db()
-    existing_presets = {preset['name']: preset for preset in get_presets_list(show_defaults=True, show_all=True)}
+    existing_presets = {
+        preset["name"]: preset
+        for preset in get_presets_list(show_defaults=True, show_all=True)
+    }
 
     presets_to_update = []
     presets_to_create = []
 
     for preset in presets_to_import:
         if not validate_preset(preset):
-            console.print(f"[yellow]Skipping invalid preset: {preset.get('name', 'Unknown')}[/yellow]")
+            console.print(
+                f"[yellow]Skipping invalid preset: {preset.get('name', 'Unknown')}[/yellow]"
+            )
             continue
 
-        if preset['name'] in existing_presets:
+        if preset["name"] in existing_presets:
             presets_to_update.append(preset)
         else:
             presets_to_create.append(preset)
@@ -109,17 +115,25 @@ def import_presets() -> None:
     if presets_to_update:
         update_choice = inquirer.list_input(
             "Some presets already exist. How would you like to proceed?",
-            choices=["Update All", "Select Individually", "Skip Updates"]
+            choices=["Update All", "Select Individually", "Skip Updates"],
         )
 
         if update_choice == "Update All":
             presets_to_update_final = presets_to_update
         elif update_choice == "Select Individually":
-            choices = [inquirer.Checkbox('selected_presets',
-                                         message="Select presets to update",
-                                         choices=[preset['name'] for preset in presets_to_update])]
+            choices = [
+                inquirer.Checkbox(
+                    "selected_presets",
+                    message="Select presets to update",
+                    choices=[preset["name"] for preset in presets_to_update],
+                )
+            ]
             answers = inquirer.prompt(choices)
-            presets_to_update_final = [preset for preset in presets_to_update if preset['name'] in answers['selected_presets']]
+            presets_to_update_final = [
+                preset
+                for preset in presets_to_update
+                if preset["name"] in answers["selected_presets"]
+            ]
         else:
             presets_to_update_final = []
 
@@ -128,89 +142,185 @@ def import_presets() -> None:
 
     # Perform database operations
     try:
-        with db.conn:  # This automatically manages transactions
+        with db.conn:  
             for preset in presets_to_update_final:
-                update_preset(db, preset, existing_presets[preset['name']])
+                update_preset(preset)
 
             for preset in presets_to_create:
-                create_preset(db, preset)
+                create_preset(preset) 
 
-        console.print(f"[green]Import complete. Created {len(presets_to_create)} new presets and updated {len(presets_to_update_final)} existing presets.[/green]")
+        console.print(
+            f"[green]Import complete. Created {len(presets_to_create)} new presets and updated {len(presets_to_update_final)} existing presets.[/green]"
+        )
     except Exception as e:
         console.print(f"[bold red]Error during import:[/bold red] {str(e)}")
         console.print("[yellow]All changes have been rolled back.[/yellow]")
 
-def update_preset(db: Database, new_preset: Dict[str, Any], existing_preset: Dict[str, Any]) -> None:
-    preset_data = json.dumps(new_preset['preset_data'])
+
+
+def update_preset(preset: Dict[str, Any]) -> None:
+    db = get_db()
+    preset_data = json.dumps(preset["preset_data"])
     db.execute(
-        "UPDATE style_presets SET preset_data = ?, updated_at = ? WHERE id = ?",
-        [preset_data, datetime.now().isoformat(), existing_preset['id']]
+        "UPDATE style_presets SET preset_data = ?, updated_at = ? WHERE name = ?",
+        [preset_data, datetime.now().isoformat(), preset["name"]],
     )
 
-def create_preset(db: Database, preset: Dict[str, Any]) -> None:
+
+def create_preset(preset: Dict[str, Any]) -> None:
+    db = get_db()
     preset_id = str(uuid.uuid4())
-    preset_data = json.dumps(preset['preset_data'])
+    preset_data = json.dumps(preset["preset_data"])
     now = datetime.now().isoformat()
     db.execute(
         "INSERT INTO style_presets (id, name, preset_data, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        [preset_id, preset['name'], preset_data, preset['type'], now, now]
+        [preset_id, preset["name"], preset_data, preset["type"], now, now],
     )
 
+
 def validate_preset(preset: Dict[str, Any]) -> bool:
-    required_keys = ['name', 'type', 'preset_data']
+    required_keys = ["name", "type", "preset_data"]
     if not all(key in preset for key in required_keys):
         return False
-    if not isinstance(preset['preset_data'], dict):
+    if not isinstance(preset["preset_data"], dict):
         return False
-    if 'positive_prompt' not in preset['preset_data'] or 'negative_prompt' not in preset['preset_data']:
+    if (
+        "positive_prompt" not in preset["preset_data"]
+        or "negative_prompt" not in preset["preset_data"]
+    ):
         return False
     return True
 
 
 def export_presets() -> None:
     presets = get_presets_list(show_defaults=False, show_all=True)
-    
+
     if not presets:
         console.print("[yellow]No presets found to export.[/yellow]")
         return
 
     choices = [f"{preset['name']} (ID: {preset['id']})" for preset in presets]
     questions = [
-        inquirer.Checkbox('selected_presets',
-                          message="Select presets to export",
-                          choices=choices)
+        inquirer.Checkbox(
+            "selected_presets", message="Select presets to export", choices=choices
+        )
     ]
 
     answers = inquirer.prompt(questions)
-    
-    if not answers or not answers['selected_presets']:
+
+    if not answers or not answers["selected_presets"]:
         console.print("Export cancelled.")
         return
 
-    selected_presets = [preset for preset in presets 
-                        if f"{preset['name']} (ID: {preset['id']})" in answers['selected_presets']]
+    selected_presets = [
+        preset
+        for preset in presets
+        if f"{preset['name']} (ID: {preset['id']})" in answers["selected_presets"]
+    ]
 
     export_data = []
     for preset in selected_presets:
-        export_data.append({
-            'name': preset['name'],
-            'type': preset['type'],
-            'preset_data': json.loads(preset['preset_data'])
-        })
+        export_data.append(
+            {
+                "name": preset["name"],
+                "type": preset["type"],
+                "preset_data": json.loads(preset["preset_data"]),
+            }
+        )
 
-    export_filename = inquirer.text(message="Enter the export filename (without extension)")
+    export_filename = inquirer.text(
+        message="Enter the export filename (without extension)"
+    )
     export_path = f"{export_filename}.json"
 
     try:
-        with open(export_path, 'w') as f:
+        with open(export_path, "w") as f:
             json.dump(export_data, f, indent=2)
         console.print(f"[green]Presets exported successfully to {export_path}[/green]")
     except Exception as e:
         console.print(f"[bold red]Error exporting presets:[/bold red] {str(e)}")
 
 
-def delete_preset(preset: Dict[str, Any]) -> None:
-    pass
+def delete_presets() -> None:
+    db = get_db()
+    
+    delete_source = inquirer.list_input(
+        "Select delete source",
+        choices=["Select from list", "Import from file", "Import from URL", "Cancel"]
+    )
+
+    if delete_source == "Cancel":
+        console.print("Deletion cancelled.")
+        return
+
+    presets_to_delete = []
+
+    if delete_source == "Select from list":
+        all_presets = get_presets_list(show_defaults=False, show_all=True)
+        choices = [f"{preset['name']} (ID: {preset['id']})" for preset in all_presets]
+        questions = [
+            inquirer.Checkbox('selected_presets',
+                              message="Select presets to delete",
+                              choices=choices)
+        ]
+        answers = inquirer.prompt(questions)
+        if not answers or not answers['selected_presets']:
+            console.print("No presets selected for deletion.")
+            return
+        presets_to_delete = [preset for preset in all_presets 
+                             if f"{preset['name']} (ID: {preset['id']})" in answers['selected_presets']]
+    elif delete_source in ["Import from file", "Import from URL"]:
+        if delete_source == "Import from file":
+            file_path = inquirer.text(message="Enter the path to the JSON file")
+            try:
+                with open(file_path, 'r') as f:
+                    preset_names = json.load(f)
+            except Exception as e:
+                console.print(f"[bold red]Error reading file:[/bold red] {str(e)}")
+                return
+        else:  # Import from URL
+            url = inquirer.text(message="Enter the URL of the JSON file")
+            try:
+                response = httpx.get(url)
+                response.raise_for_status()
+                preset_names = response.json()
+            except Exception as e:
+                console.print(f"[bold red]Error fetching from URL:[/bold red] {str(e)}")
+                return
+
+        if not isinstance(preset_names, list):
+            console.print("[bold red]Error:[/bold red] Invalid JSON format. Expected a list of preset names.")
+            return
+
+        all_presets = get_presets_list(show_defaults=False, show_all=True)
+        presets_to_delete = [preset for preset in all_presets if preset['name'] in preset_names]
+
+    if not presets_to_delete:
+        console.print("[yellow]No presets found to delete.[/yellow]")
+        return
+
+    # Confirmation
+    preset_names = ", ".join([preset['name'] for preset in presets_to_delete])
+    confirm = inquirer.confirm(
+        f"Are you sure you want to delete the following presets: {preset_names}? This action is irreversible."
+    )
+    if not confirm:
+        console.print("Deletion cancelled.")
+        return
+
+    # Create a snapshot before making changes
+    create_snapshot()
+
+    # Perform deletion
+    try:
+        with db.conn:  # This automatically manages transactions
+            for preset in presets_to_delete:
+                db.execute("DELETE FROM style_presets WHERE id = ?", [preset['id']])
+
+        console.print(f"[green]Successfully deleted {len(presets_to_delete)} presets.[/green]")
+    except Exception as e:
+        console.print(f"[bold red]Error during deletion:[/bold red] {str(e)}")
+        console.print("[yellow]All changes have been rolled back.[/yellow]")
 
 
 def update_preset(preset: Dict[str, Any]) -> None:

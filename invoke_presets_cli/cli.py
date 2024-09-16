@@ -11,7 +11,7 @@ from .functions import (
     restore_snapshot,
     create_snapshot,
     export_presets,
-    import_presets
+    import_presets,
 )
 
 from rich.traceback import install
@@ -90,7 +90,7 @@ def database_restore_command():
 
 @invoke_styles_cli.command("import", help="Import a style preset")
 def styles_import_command():
-    pass
+    import_presets()
 
 
 @invoke_styles_cli.command("export", help="Export a style preset")
