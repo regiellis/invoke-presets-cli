@@ -12,6 +12,7 @@ from .functions import (
     create_snapshot,
     export_presets,
     import_presets,
+    delete_presets,
 )
 
 from rich.traceback import install
@@ -82,7 +83,7 @@ def database_delete_command():
 
 
 @database_cli.command(
-    "restore-snapshot", help="Res tore a snapshot of the Invoke AI database."
+    "restore-snapshot", help="Restore a snapshot of the Invoke AI database."
 )
 def database_restore_command():
     restore_snapshot()
@@ -96,6 +97,11 @@ def styles_import_command():
 @invoke_styles_cli.command("export", help="Export a style preset")
 def styles_export_command():
     export_presets()
+
+
+@invoke_styles_cli.command("delete", help="Delete a style preset")
+def styles_delete_command():
+    delete_presets()
 
 
 @invoke_styles_cli.command("list", help="List all available style presets.")

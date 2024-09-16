@@ -142,12 +142,12 @@ def import_presets() -> None:
 
     # Perform database operations
     try:
-        with db.conn:  
+        with db.conn:
             for preset in presets_to_update_final:
                 update_preset(preset)
 
             for preset in presets_to_create:
-                create_preset(preset) 
+                create_preset(preset)
 
         console.print(
             f"[green]Import complete. Created {len(presets_to_create)} new presets and updated {len(presets_to_update_final)} existing presets.[/green]"
@@ -155,7 +155,6 @@ def import_presets() -> None:
     except Exception as e:
         console.print(f"[bold red]Error during import:[/bold red] {str(e)}")
         console.print("[yellow]All changes have been rolled back.[/yellow]")
-
 
 
 def update_preset(preset: Dict[str, Any]) -> None:
@@ -243,10 +242,10 @@ def export_presets() -> None:
 
 def delete_presets() -> None:
     db = get_db()
-    
+
     delete_source = inquirer.list_input(
         "Select delete source",
-        choices=["Select from list", "Import from file", "Import from URL", "Cancel"]
+        choices=["Select from list", "Import from file", "Import from URL", "Cancel"],
     )
 
     if delete_source == "Cancel":
@@ -259,21 +258,24 @@ def delete_presets() -> None:
         all_presets = get_presets_list(show_defaults=False, show_all=True)
         choices = [f"{preset['name']} (ID: {preset['id']})" for preset in all_presets]
         questions = [
-            inquirer.Checkbox('selected_presets',
-                              message="Select presets to delete",
-                              choices=choices)
+            inquirer.Checkbox(
+                "selected_presets", message="Select presets to delete", choices=choices
+            )
         ]
         answers = inquirer.prompt(questions)
-        if not answers or not answers['selected_presets']:
+        if not answers or not answers["selected_presets"]:
             console.print("No presets selected for deletion.")
             return
-        presets_to_delete = [preset for preset in all_presets 
-                             if f"{preset['name']} (ID: {preset['id']})" in answers['selected_presets']]
+        presets_to_delete = [
+            preset
+            for preset in all_presets
+            if f"{preset['name']} (ID: {preset['id']})" in answers["selected_presets"]
+        ]
     elif delete_source in ["Import from file", "Import from URL"]:
         if delete_source == "Import from file":
             file_path = inquirer.text(message="Enter the path to the JSON file")
             try:
-                with open(file_path, 'r') as f:
+                with open(file_path, "r") as f:
                     preset_names = json.load(f)
             except Exception as e:
                 console.print(f"[bold red]Error reading file:[/bold red] {str(e)}")
@@ -289,18 +291,22 @@ def delete_presets() -> None:
                 return
 
         if not isinstance(preset_names, list):
-            console.print("[bold red]Error:[/bold red] Invalid JSON format. Expected a list of preset names.")
+            console.print(
+                "[bold red]Error:[/bold red] Invalid JSON format. Expected a list of preset names."
+            )
             return
 
         all_presets = get_presets_list(show_defaults=False, show_all=True)
-        presets_to_delete = [preset for preset in all_presets if preset['name'] in preset_names]
+        presets_to_delete = [
+            preset for preset in all_presets if preset["name"] in preset_names
+        ]
 
     if not presets_to_delete:
         console.print("[yellow]No presets found to delete.[/yellow]")
         return
 
     # Confirmation
-    preset_names = ", ".join([preset['name'] for preset in presets_to_delete])
+    preset_names = ", ".join([preset["name"] for preset in presets_to_delete])
     confirm = inquirer.confirm(
         f"Are you sure you want to delete the following presets: {preset_names}? This action is irreversible."
     )
@@ -315,9 +321,11 @@ def delete_presets() -> None:
     try:
         with db.conn:  # This automatically manages transactions
             for preset in presets_to_delete:
-                db.execute("DELETE FROM style_presets WHERE id = ?", [preset['id']])
+                db.execute("DELETE FROM style_presets WHERE id = ?", [preset["id"]])
 
-        console.print(f"[green]Successfully deleted {len(presets_to_delete)} presets.[/green]")
+        console.print(
+            f"[green]Successfully deleted {len(presets_to_delete)} presets.[/green]"
+        )
     except Exception as e:
         console.print(f"[bold red]Error during deletion:[/bold red] {str(e)}")
         console.print("[yellow]All changes have been rolled back.[/yellow]")
@@ -600,10 +608,6 @@ def ensure_snapshots_dir():
 
 # ANCHOR: ABOUT FUNCTIONS START
 def about() -> None:
-    pass
-
-
-def changelog() -> None:
     pass
 
 
