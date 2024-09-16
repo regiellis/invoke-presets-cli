@@ -8,10 +8,10 @@ from .functions import (
     display_presets,
     list_snapshots,
     delete_snapshot,
-    load_snapshots,
     restore_snapshot,
-    save_snapshots,
     create_snapshot,
+    export_presets,
+    import_presets
 )
 
 from rich.traceback import install
@@ -62,7 +62,9 @@ invoke_styles_cli.add_typer(
 )
 
 
-@database_cli.command("create-snapshot", help="Create a snapshot of the Invoke AI database.")
+@database_cli.command(
+    "create-snapshot", help="Create a snapshot of the Invoke AI database."
+)
 def datebase_create_command():
     create_snapshot()
 
@@ -70,14 +72,18 @@ def datebase_create_command():
 @database_cli.command("list-snapshots", help="List all available snapshots.")
 def database_list_command():
     list_snapshots()
-    
 
-@database_cli.command("delete-snapshot", help="Delete a snapshot of the Invoke AI database.")
+
+@database_cli.command(
+    "delete-snapshot", help="Delete a snapshot of the Invoke AI database."
+)
 def database_delete_command():
     delete_snapshot()
-    
 
-@database_cli.command("restore-snapshot", help="Restore a snapshot of the Invoke AI database.")
+
+@database_cli.command(
+    "restore-snapshot", help="Res tore a snapshot of the Invoke AI database."
+)
 def database_restore_command():
     restore_snapshot()
 
@@ -89,7 +95,7 @@ def styles_import_command():
 
 @invoke_styles_cli.command("export", help="Export a style preset")
 def styles_export_command():
-    pass
+    export_presets()
 
 
 @invoke_styles_cli.command("list", help="List all available style presets.")
