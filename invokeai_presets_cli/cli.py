@@ -46,20 +46,20 @@ Examples:
 $ invoke-styles 
 """
 
-__all__ = ["invoke_styles_cli"]
+__all__ = ["invoke_presets_cli"]
 __version__ = __version__
 
-invoke_styles_cli = typer.Typer()
+invoke_presets_cli = typer.Typer()
 database_cli = typer.Typer()
 utils_cli = typer.Typer()
 
-invoke_styles_cli.add_typer(
+invoke_presets_cli.add_typer(
     database_cli,
     name="database",
     help="Manage the snapshots of the Invoke AI database.",
     no_args_is_help=True,
 )
-invoke_styles_cli.add_typer(
+invoke_presets_cli.add_typer(
     utils_cli, name="tools", help="Utilities.", no_args_is_help=True
 )
 
@@ -90,22 +90,22 @@ def database_restore_command():
     restore_snapshot()
 
 
-@invoke_styles_cli.command("import", help="Import a style preset")
+@invoke_presets_cli.command("import", help="Import a style preset")
 def styles_import_command():
     import_presets()
 
 
-@invoke_styles_cli.command("export", help="Export a style preset")
+@invoke_presets_cli.command("export", help="Export a style preset")
 def styles_export_command():
     export_presets()
 
 
-@invoke_styles_cli.command("delete", help="Delete a style preset")
+@invoke_presets_cli.command("delete", help="Delete a style preset")
 def styles_delete_command():
     delete_presets()
 
 
-@invoke_styles_cli.command("list", help="List all available style presets.")
+@invoke_presets_cli.command("list", help="List all available style presets.")
 def styles_list_command(
     show_defaults: Annotated[
         bool,
@@ -127,7 +127,7 @@ def styles_list_command(
     display_presets(show_defaults, show_all)
 
 
-@invoke_styles_cli.command("about", help="Functions for information on this tool.")
+@invoke_presets_cli.command("about", help="Functions for information on this tool.")
 def about_command(
     readme: bool = typer.Option(
         True, "--readme", "-r", help="Show the README.md content"
