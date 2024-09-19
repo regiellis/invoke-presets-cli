@@ -18,6 +18,7 @@ from sqlite3 import Cursor
 from .helpers import feedback_message, create_table, add_rows_to_table, random_name
 
 from rich.markdown import Markdown
+from rich.progress import Progress
 from rich.console import Console
 
 from . import INVOKE_AI_DIR, SNAPSHOTS
@@ -43,16 +44,16 @@ __all__ = [
 ]
 
 
-def get_db(connection:bool) -> Any:
+def get_db(connection: bool) -> Any:
     if connection:
         return sqlite3.connect(DATABASE_PATH)
-    
+
     return sqlite3.connect(DATABASE_PATH).cursor()
 
 
 # ANCHOR: PRESET FUNCTIONS START
 def get_presets_list(show_defaults: bool, show_all: bool) -> List[Dict[str, Any]]:
-    db = get_db()
+    db = get_db(connection=True)
     base_query = "SELECT * FROM style_presets"
     conditions = {
         (False, False): "WHERE type = 'user'",
@@ -106,7 +107,7 @@ def import_presets() -> None:
         )
         return
 
-    db = get_db()
+    db = get_db(connection=True)
     existing_presets = {
         preset["name"]: preset
         for preset in get_presets_list(show_defaults=True, show_all=True)
@@ -262,7 +263,7 @@ def display_presets(show_defaults: bool, show_all: bool) -> None:
         "Available presets",
         [("ID", "yellow"), ("Name", "white"), ("Prompts", "white")],
     )
-    
+
     if not presets:
         feedback_message("No presets found", "warning")
         return
@@ -330,7 +331,7 @@ def export_presets() -> None:
 
 
 def delete_presets() -> None:
-    db = get_db()
+    db = get_db(connection=True)
     delete_source = inquirer.list_input(
         "Select delete source",
         choices=["Select from list", "Import from file", "Import from URL", "Cancel"],
@@ -422,6 +423,7 @@ def delete_presets() -> None:
         console.print(f"[bold red]Error during deletion:[/bold red] {str(e)}")
         console.print("[yellow]All changes have been rolled back.[/yellow]")
 
+
 # ANCHOR: PRESET FUNCTIONS END
 
 
@@ -439,10 +441,24 @@ def create_snapshot() -> None:
     snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_name)
 
     try:
-        # Use SQLite backup API
-        with get_db(connection=True) as source_conn:
-            with get_db(connection=True) as dest_conn:
-                source_conn.backup(dest_conn)
+        with Progress() as progress:
+            task = progress.add_task("[green]Creating snapshot...", total=100)
+
+            # Use SQLite backup API with progress feedback
+            with (
+                get_db(connection=True) as source_conn,
+                sqlite3.connect(snapshot_path) as dest_conn,
+            ):
+                source = source_conn.cursor()
+                source.execute("SELECT count(*) FROM sqlite_master")
+                total_objects = source.fetchone()[0]
+
+                def progress_callback(status, remaining, total):
+                    progress.update(
+                        task, completed=int((total - remaining) / total * 100)
+                    )
+
+                source_conn.backup(dest_conn, pages=1, progress=progress_callback)
 
         snapshots = load_snapshots()
         snapshots.append({"name": snapshot_name, "timestamp": timestamp})
@@ -456,6 +472,8 @@ def create_snapshot() -> None:
 
         save_snapshots(snapshots)
         console.print(f"[green]Snapshot created successfully: {snapshot_name}[/green]")
+    except sqlite3.Error as e:
+        console.print(f"[bold red]SQLite Error creating snapshot:[/bold red] {str(e)}")
     except Exception as e:
         console.print(f"[bold red]Error creating snapshot:[/bold red] {str(e)}")
 
@@ -504,62 +522,53 @@ def delete_snapshot() -> None:
 
     # Create choices for the inquirer prompt
     choices = [f"{s['name']} ({s['timestamp']})" for s in snapshots]
-    choices.append("Cancel")
 
-    # Create the selection prompt
+    # Create the checkbox prompt
     questions = [
-        inquirer.List(
-            "snapshot",
-            message="Select a snapshot to delete",
+        inquirer.Checkbox(
+            "snapshots",
+            message="Select snapshots to delete (use spacebar to select, enter to confirm)",
             choices=choices,
-            default="Cancel",
         )
     ]
 
     # Present the selection menu
     answers = inquirer.prompt(questions)
 
-    if not answers or answers["snapshot"] == "Cancel":
-        console.print("Deletion cancelled.")
-        return
-
-    # Extract the snapshot name from the selection
-    snapshot_name = answers["snapshot"].split(" (")[0]
-    snapshot_to_delete = next(
-        (s for s in snapshots if s["name"] == snapshot_name), None
-    )
-
-    if not snapshot_to_delete:
-        console.print(f"[yellow]Error: Selected snapshot not found.[/yellow]")
+    if not answers or not answers["snapshots"]:
+        console.print("No snapshots selected. Deletion cancelled.")
         return
 
     # Confirmation prompt
     confirm = inquirer.confirm(
-        "Are you sure you want to delete this snapshot? This action is irreversible."
+        f"Are you sure you want to delete {len(answers['snapshots'])} snapshot(s)? This action is irreversible."
     )
 
     if not confirm:
         console.print("Deletion cancelled.")
         return
 
-    snapshots = [s for s in snapshots if s["name"] != snapshot_name]
-    save_snapshots(snapshots)
+    for selected in answers["snapshots"]:
+        snapshot_name = selected.split(" (")[0]  # Extract the name from the selection
+        snapshots = [s for s in snapshots if s["name"] != snapshot_name]
+        snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_name)
+        if os.path.exists(snapshot_path):
+            try:
+                os.remove(snapshot_path)
+                console.print(
+                    f"[green]Snapshot '{snapshot_name}' deleted successfully.[/green]"
+                )
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error deleting snapshot file '{snapshot_name}':[/bold red] {str(e)}"
+                )
+        else:
+            console.print(
+                f"[yellow]Warning: Snapshot file '{snapshot_name}' not found on disk.[/yellow]"
+            )
 
-    snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_name)
-    if os.path.exists(snapshot_path):
-        try:
-            os.remove(snapshot_path)
-            console.print(
-                f"[green]Snapshot '{snapshot_name}' deleted successfully.[/green]"
-            )
-        except Exception as e:
-            console.print(
-                f"[bold red]Error deleting snapshot file:[/bold red] {str(e)}"
-            )
-    else:
-        console.print(
-            f"[yellow]Warning: Snapshot file '{snapshot_name}' not found on disk.[/yellow]"
-        )
+    save_snapshots(snapshots)
+    console.print("[green]Snapshot deletion process completed.[/green]")
 
 
 def restore_snapshot():
@@ -674,6 +683,7 @@ def ensure_snapshots_dir():
 
 # ANCHOR: ABOUT FUNCTIONS START
 
+
 def display_readme(requested_file: str) -> None:
 
     readme_path = Path(requested_file)
@@ -686,7 +696,8 @@ def display_readme(requested_file: str) -> None:
         console.print(md)
     else:
         typer.echo(f"{requested_file} not found in the current directory.")
-        
+
+
 def about_cli(readme: bool, changelog: bool) -> None:
     documents: List[str] = []
     if readme:

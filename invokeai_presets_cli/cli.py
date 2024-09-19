@@ -13,7 +13,7 @@ from .functions import (
     export_presets,
     import_presets,
     delete_presets,
-    about_cli
+    about_cli,
 )
 
 from rich.traceback import install
@@ -136,15 +136,18 @@ def about_command(
         False, "--changelog", "-c", help="Show the CHANGELOG.md content"
     ),
     version: bool = typer.Option(
-        False, "--version", "-v", help="Show the current version",
+        False,
+        "--version",
+        "-v",
+        help="Show the current version",
     ),
 ):
     """
     Show README.md and/or CHANGELOG.md content.
     """
-    
+
     if version:
         typer.echo(f"InvokeAI Preset CLI version: {__version__}", color=True)
         return
-    
+
     about_cli(readme, changelog)
