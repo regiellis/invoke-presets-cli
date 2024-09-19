@@ -382,7 +382,8 @@ def delete_presets() -> None:
 
     if delete_source == "Select from list":
         all_presets = get_presets_list(show_defaults=False, show_all=True)
-        choices = [f"{preset['name']} (ID: {preset['id']})" for preset in all_presets]
+        #TODO: Refactor ...
+        choices = [f"{preset[1]} (ID: {preset[0]})" for preset in all_presets]
         questions = [
             inquirer.Checkbox(
                 "selected_presets", message="Select presets to delete", choices=choices
@@ -397,7 +398,8 @@ def delete_presets() -> None:
         presets_to_delete = [
             preset
             for preset in all_presets
-            if f"{preset['name']} (ID: {preset['id']})" in answers["selected_presets"]
+            #TODO: Refactor
+            if f"{preset[1]} (ID: {preset[0]})" in answers["selected_presets"]
         ]
     elif delete_source in ["Import from file", "Import from URL"]:
         if delete_source == "Import from file":
@@ -425,9 +427,12 @@ def delete_presets() -> None:
             )
             return
 
-        all_presets = get_presets_list(show_defaults=False, show_all=True)
+        user_presets = get_presets_list(show_defaults=False, show_all=False)
+        
         presets_to_delete = [
-            preset for preset in all_presets if preset["name"] in preset_names
+            #TODO: This brittle ASF...need to stop using tuples for this or start unpacking the, but for now, it works
+            preset 
+            for preset in user_presets
         ]
 
     if not presets_to_delete:
@@ -435,7 +440,7 @@ def delete_presets() -> None:
         return
 
     # Confirmation
-    preset_names = ", ".join([preset["name"] for preset in presets_to_delete])
+    preset_names = ", ".join([preset[1] for preset in presets_to_delete])
     confirm = inquirer.confirm(
         f"Are you sure you want to delete the following presets: {preset_names}? This action is irreversible."
     )
@@ -449,10 +454,10 @@ def delete_presets() -> None:
 
     # Perform deletion
     try:
-        with db.conn:
+        with db:
             # This automatically manages transactions
             for preset in presets_to_delete:
-                db.execute("DELETE FROM style_presets WHERE id = ?", [preset["id"]])
+                db.execute("DELETE FROM style_presets WHERE id = ?", [preset[0]])
         console.print(
             f"[green]Successfully deleted {len(presets_to_delete)} presets.[/green]"
         )

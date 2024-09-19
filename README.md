@@ -1,16 +1,22 @@
 # InvokeAI Preset CLI
 
-
 > [!IMPORTANT]
 > This tool makes changes to the Invoke AI database and while it does make snapshots before operations
-> that write to a table, there is always a chance the data could be come corrupted. You the stand-alone
-> commands to make backups or external tools.
+> that write to a table, there is always a chance the data could become corrupted. Use stand-alone tools
+> if you are paranoid about losing data. This tool is provided as-is and is not guaranteed to work in all
+> environments. It is recommended to backup your database before using this tool at least once.
 
 ## Overview
 
-**Invoke Preset CLI** is a simple CLI tool that streamlines the process of managing large
+**InvokeAI Preset CLI** is a simple CLI tool that streamlines the process of managing large
 entries of presets into the Invoke AI. The tool was primarily designed to allow me to quickly
 add, update, and delete presets in bulk.
+
+Presets/styles can be found at the [gist.github.com/regiellis](https://gist.github.com/regiellis/af5fc6a046d69d62036c6e9be2ff08da)
+
+These styles are re-post of the work from the great people at:
+[twri](https://github.com/twri), [3Diva](https://github.com/3Diva), [Marc K3nt3L](https://github.com/K3nt3L), and the
+[fooocus](https://github.com/lllyasviel/Fooocus) project. Show your love on their projects.
 
 
 ![screenshot](screen.png)
