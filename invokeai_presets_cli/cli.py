@@ -96,8 +96,18 @@ def database_restore_command():
 
 
 @invoke_presets_cli.command("import", help="Import a style preset")
-def styles_import_command():
-    import_presets()
+def styles_import_command(
+    project_type: Annotated[
+        bool,
+        typer.Option(
+            "--project",
+            "-p",
+            help="The type of preset to import, either 'user' or 'project'. Default is 'user'",
+            show_default="False",
+        ),
+    ]=False
+):
+    import_presets(project_type)
 
 
 @invoke_presets_cli.command("export", help="Export a style preset")

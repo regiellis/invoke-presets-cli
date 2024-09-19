@@ -57,7 +57,7 @@ def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool) ->
     base_query = "SELECT * FROM style_presets"
     conditions = {
         (False, True, False): "",
-        (False, False, False): "WHERE type = 'user'",
+        (False, False, False):"WHERE type = 'user'",
         (True, False, False): "WHERE type = 'default'",
         (False, False, True): "WHERE type = 'project'",
     }
@@ -66,7 +66,7 @@ def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool) ->
     return list(db.execute(query))
 
 
-def import_presets() -> None:
+def import_presets(project_type: bool) -> None:
     source = inquirer.list_input(
         "Select import source", choices=["Local File", "URL", "Cancel"]
     )
@@ -146,7 +146,7 @@ def import_presets() -> None:
     db = get_db(connection=True)
     existing_presets = {
         preset[1]: preset  # Tuple // name is 1st element
-        for preset in get_presets_list(show_defaults=False, show_all=True)
+        for preset in get_presets_list(show_defaults=False, show_all=True, show_project=False)
     }
     presets_to_update = []
     presets_to_create = []
@@ -157,7 +157,7 @@ def import_presets() -> None:
                 f"[yellow]Skipping invalid preset: {preset.get('name', 'Unknown')}[/yellow]"
             )
             continue
-        converted_preset = convert_preset_format(preset)
+        converted_preset = convert_preset_format(preset, project_type)
         if converted_preset["name"] in existing_presets:
             presets_to_update.append(converted_preset)
         else:
@@ -247,14 +247,14 @@ def create_preset_without_trigger(
     )
 
 
-def convert_preset_format(preset: Dict[str, Any]) -> Dict[str, Any]:
+def convert_preset_format(preset: Dict[str, Any], project_type) -> Dict[str, Any]:
     if "preset_data" in preset:
         # Already in the correct format
         return preset
     # Convert from the new format to the database format
     return {
         "name": preset["name"],
-        "type": preset.get("type", "user"),  # Default to 'user' if not specified
+        "type": "project" if project_type else preset.get("type", "user"),  # Default to 'user' if not specified
         "preset_data": {
             "positive_prompt": preset.get("positive_prompt", preset.get("prompt", "")),
             "negative_prompt": preset.get("negative_prompt", ""),
@@ -303,9 +303,8 @@ def display_presets(show_defaults: bool, show_all: bool, show_project: bool) -> 
     )
 
     if not presets:
-        types = [t for t, flag in zip(['default', 'all', 'project'], [show_defaults, show_all, show_project]) if flag]
-        display_type = ' or '.join(types) if types else 'user'
-        feedback_message(f"No presets found for {display_type}", "warning")
+        types = ' or '.join(t for t, f in zip(['default', 'all', 'project'], [show_defaults, show_all, show_project]) if f) or 'user'
+        feedback_message(f"No presets found for {types}", "warning")
         return
 
     for preset in presets:
@@ -396,7 +395,7 @@ def delete_presets() -> None:
     presets_to_delete = []
 
     if delete_source == "Select from list":
-        all_presets = get_presets_list(show_defaults=False, show_all=True)
+        all_presets = get_presets_list(show_defaults=False, show_all=True, show_project=False)
         # TODO: Refactor ...
         choices = [f"{preset[1]} (ID: {preset[0]})" for preset in all_presets]
         questions = [
@@ -442,7 +441,8 @@ def delete_presets() -> None:
             )
             return
 
-        user_presets = get_presets_list(show_defaults=False, show_all=False)
+        #TODO: This is sticky...need to refactor
+        user_presets = get_presets_list(show_defaults=False, show_all=False, show_project=False)
 
         presets_to_delete = [
             # TODO: This brittle ASF...need to stop using tuples for this or start unpacking the, but for now, it works
