@@ -125,6 +125,9 @@ def load_environment_variables() -> None:
     # Set environment variables
     os.environ["INVOKE_AI_DIR"] = os.getenv("INVOKE_AI_DIR", "")
     os.environ["SNAPSHOTS"] = os.getenv("SNAPSHOTS", "")
+    
+    # for windows
+    os.environ['TERM'] = 'cygwin'
 
 
 # Load environment variables
