@@ -322,7 +322,7 @@ def display_presets(show_defaults: bool, show_all: bool, show_project: bool) -> 
 
 
 def export_presets() -> None:
-    presets = get_presets_list(show_defaults=False, show_all=True)
+    presets = get_presets_list(show_defaults=False, show_all=True, show_project=False)
     if not presets:
         console.print("[yellow]No presets found to export.[/yellow]")
         return
