@@ -73,11 +73,11 @@ def load_environment_variables() -> None:
     Load environment variables from a .env file or create one if not found.
 
     :raises FileNotFoundError: If the .env file is not found in any of the
-                               searched locations and user chooses not to create one.
+    searched locations and user chooses not to create one.
     """
     env_locations = [
-        "~/.config/invoke-presets-itsjustregi/.env",
-        "~/.invoke-presets-itsjustregi/.env",
+        "~/.config/invokeai-presets-itsjustregi/.env",
+        "~/.invokeai-presets-itsjustregi/.env",
         "~/.env",
         "./.env",
     ]
@@ -101,7 +101,7 @@ def load_environment_variables() -> None:
         "Would you like to create a new .env file?", default=True
     )
     if create_new:
-        default_path = Path("~/.config/invoke-presets-itsjustregi/.env").expanduser()
+        default_path = Path("~/.config/invokeai-presets-itsjustregi/.env").expanduser()
         questions = [
             inquirer.Path(
                 "env_path",

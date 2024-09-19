@@ -5,5 +5,4 @@ shellingham
 python-dotenv
 inquirer
 packaging
-sqlite-utils
 pytest

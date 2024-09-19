@@ -1,6 +1,6 @@
 import pytest
 from typer.testing import CliRunner
-from invoke_presets_cli.cli import invoke_presets_cli
+from invokeai_presets_cli.cli import invoke_presets_cli
 
 
 def test_commands(runner, command, args, expected_output):

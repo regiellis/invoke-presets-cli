@@ -6,8 +6,8 @@ import shutil
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-from sqlite_utils import Database
 import sqlite3
+from sqlite3 import Cursor
 import inquirer
 
 from .helpers import feedback_message, create_table, add_rows_to_table, random_name
@@ -31,31 +31,31 @@ __all__ = [
     "list_snapshots",
     "delete_snapshot",
     "restore_snapshot",
+    "import_presets",
+    "export_presets",
+    "delete_presets",
 ]
 
 
-def get_db() -> Database:
-    return Database(DATABASE_PATH)
+def get_db(connection:bool) -> Any:
+    if connection:
+        return sqlite3.connect(DATABASE_PATH)
+    
+    return sqlite3.connect(DATABASE_PATH).cursor()
 
 
 # ANCHOR: PRESET FUNCTIONS START
 def get_presets_list(show_defaults: bool, show_all: bool) -> List[Dict[str, Any]]:
     db = get_db()
     base_query = "SELECT * FROM style_presets"
-
     conditions = {
         (False, False): "WHERE type = 'user'",
         (False, True): "",
         (True, False): "WHERE type = 'default'",
     }
-
     condition = conditions.get((show_defaults, show_all), "WHERE type = 'default'")
     query = f"{base_query} {condition}".strip()
-    return list(db.query(query))
-
-
-def process_preset_file(file_path: str) -> Dict[str, Any]:
-    pass
+    return list(db.execute(query))
 
 
 def import_presets() -> None:
@@ -75,12 +75,21 @@ def import_presets() -> None:
         except Exception as e:
             console.print(f"[bold red]Error reading file:[/bold red] {str(e)}")
             return
-    else:  # URL
+    else:
+        # URL
         url = inquirer.text(message="Enter the URL of the JSON file")
         try:
             response = httpx.get(url)
             response.raise_for_status()
-            presets_to_import = response.json()
+            content = response.text
+            try:
+                presets_to_import = json.loads(content)
+            except json.JSONDecodeError as e:
+                console.print(f"[bold red]Error parsing JSON:[/bold red] {str(e)}")
+                console.print(
+                    f"Error occurred near: {content[max(0, e.pos-20):e.pos+20]}"
+                )
+                return
         except Exception as e:
             console.print(f"[bold red]Error fetching from URL:[/bold red] {str(e)}")
             return
@@ -96,7 +105,6 @@ def import_presets() -> None:
         preset["name"]: preset
         for preset in get_presets_list(show_defaults=True, show_all=True)
     }
-
     presets_to_update = []
     presets_to_create = []
 
@@ -106,18 +114,18 @@ def import_presets() -> None:
                 f"[yellow]Skipping invalid preset: {preset.get('name', 'Unknown')}[/yellow]"
             )
             continue
-
-        if preset["name"] in existing_presets:
-            presets_to_update.append(preset)
+        converted_preset = convert_preset_format(preset)
+        if converted_preset["name"] in existing_presets:
+            presets_to_update.append(converted_preset)
         else:
-            presets_to_create.append(preset)
+            presets_to_create.append(converted_preset)
 
+    presets_to_update_final = []
     if presets_to_update:
         update_choice = inquirer.list_input(
             "Some presets already exist. How would you like to proceed?",
             choices=["Update All", "Select Individually", "Skip Updates"],
         )
-
         if update_choice == "Update All":
             presets_to_update_final = presets_to_update
         elif update_choice == "Select Individually":
@@ -129,13 +137,16 @@ def import_presets() -> None:
                 )
             ]
             answers = inquirer.prompt(choices)
-            presets_to_update_final = [
-                preset
-                for preset in presets_to_update
-                if preset["name"] in answers["selected_presets"]
-            ]
-        else:
-            presets_to_update_final = []
+            if answers and answers["selected_presets"]:
+                presets_to_update_final = [
+                    preset
+                    for preset in presets_to_update
+                    if preset["name"] in answers["selected_presets"]
+                ]
+
+    if not presets_to_update_final and not presets_to_create:
+        console.print("[yellow]No valid presets to import or update.[/yellow]")
+        return
 
     # Create a snapshot before making changes
     create_snapshot()
@@ -143,11 +154,19 @@ def import_presets() -> None:
     # Perform database operations
     try:
         with db.conn:
+            # This automatically manages transactions
+            cursor = db.conn.cursor()
+            # Disable triggers temporarily
+            cursor.execute("PRAGMA recursive_triggers = OFF;")
+
             for preset in presets_to_update_final:
-                update_preset(preset)
+                update_preset_without_trigger(cursor, preset)
 
             for preset in presets_to_create:
-                create_preset(preset)
+                create_preset_without_trigger(cursor, preset)
+
+            # Re-enable triggers
+            cursor.execute("PRAGMA recursive_triggers = ON;")
 
         console.print(
             f"[green]Import complete. Created {len(presets_to_create)} new presets and updated {len(presets_to_update_final)} existing presets.[/green]"
@@ -157,43 +176,107 @@ def import_presets() -> None:
         console.print("[yellow]All changes have been rolled back.[/yellow]")
 
 
-def update_preset(preset: Dict[str, Any]) -> None:
-    db = get_db()
-    preset_data = json.dumps(preset["preset_data"])
-    db.execute(
-        "UPDATE style_presets SET preset_data = ?, updated_at = ? WHERE name = ?",
-        [preset_data, datetime.now().isoformat(), preset["name"]],
+def update_preset_without_trigger(
+    cursor: sqlite3.Cursor, preset: Dict[str, Any]
+) -> None:
+    preset_data = preset["preset_data"]
+    # Fix: Avoid double JSON encoding - serialize only if it's a dictionary
+    if isinstance(preset_data, dict):
+        preset_data = json.dumps(preset_data)
+    cursor.execute(
+        "UPDATE style_presets SET preset_data = ?, type = ?, updated_at = ? WHERE name = ?",
+        (preset_data, preset["type"], datetime.now().isoformat(), preset["name"]),
     )
 
 
-def create_preset(preset: Dict[str, Any]) -> None:
-    db = get_db()
+def create_preset_without_trigger(
+    cursor: sqlite3.Cursor, preset: Dict[str, Any]
+) -> None:
     preset_id = str(uuid.uuid4())
-    preset_data = json.dumps(preset["preset_data"])
     now = datetime.now().isoformat()
-    db.execute(
+    preset_data = preset["preset_data"]
+    # Fix: Avoid double JSON encoding - serialize only if it's a dictionary
+    if isinstance(preset_data, dict):
+        preset_data = json.dumps(preset_data)
+    cursor.execute(
         "INSERT INTO style_presets (id, name, preset_data, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-        [preset_id, preset["name"], preset_data, preset["type"], now, now],
+        (preset_id, preset["name"], preset_data, preset["type"], now, now),
     )
+
+
+def convert_preset_format(preset: Dict[str, Any]) -> Dict[str, Any]:
+    if "preset_data" in preset:
+        # Already in the correct format
+        return preset
+    # Convert from the new format to the database format
+    return {
+        "name": preset["name"],
+        "type": preset.get("type", "user"),  # Default to 'user' if not specified
+        "preset_data": {
+            "prompt": preset.get("prompt", ""),
+            "negative_prompt": preset.get("negative_prompt", ""),
+        },
+    }
 
 
 def validate_preset(preset: Dict[str, Any]) -> bool:
-    required_keys = ["name", "type", "preset_data"]
-    if not all(key in preset for key in required_keys):
+    if "name" not in preset:
         return False
-    if not isinstance(preset["preset_data"], dict):
+
+    if "preset_data" in preset:
+        # Validate and update the old structure
+        if not isinstance(preset["preset_data"], dict):
+            return False
+        preset["preset_data"]["prompt"] = preset["preset_data"].get("prompt", "")
+        preset["preset_data"]["negative_prompt"] = preset["preset_data"].get(
+            "negative_prompt", ""
+        )
+    elif "prompt" in preset:
+        # Validate and update the new structure
+        preset["negative_prompt"] = preset.get("negative_prompt", "")
+        # Convert to old structure
+        preset["preset_data"] = {
+            "prompt": preset["prompt"],
+            "negative_prompt": preset["negative_prompt"],
+        }
+        del preset["prompt"]
+        del preset["negative_prompt"]
+    else:
         return False
-    if (
-        "positive_prompt" not in preset["preset_data"]
-        or "negative_prompt" not in preset["preset_data"]
-    ):
-        return False
+
+    # Ensure 'type' is present
+    preset["type"] = preset.get("type", "user")
+
     return True
+
+
+def display_presets(show_defaults: bool, show_all: bool) -> None:
+    presets = get_presets_list(show_defaults, show_all)
+    presets_table = create_table(
+        "Available presets",
+        [("ID", "yellow"), ("Name", "white"), ("Prompts", "white")],
+    )
+    
+    if not presets:
+        feedback_message("No presets found", "warning")
+        return
+
+    for preset in presets:
+        # Fix: Decode preset_data before using it for display
+        prompts_data = json.loads(preset[2])
+        prompts_formatted = f"[blue]Positive Prompt: {prompts_data['positive_prompt']}[/blue] \
+        \n[yellow]Negative Prompt: {prompts_data['negative_prompt']}[/yellow]"
+        presets_table.add_row(
+            preset[0],
+            preset[1],
+            prompts_formatted,
+        )
+
+    console.print(presets_table)
 
 
 def export_presets() -> None:
     presets = get_presets_list(show_defaults=False, show_all=True)
-
     if not presets:
         console.print("[yellow]No presets found to export.[/yellow]")
         return
@@ -204,7 +287,6 @@ def export_presets() -> None:
             "selected_presets", message="Select presets to export", choices=choices
         )
     ]
-
     answers = inquirer.prompt(questions)
 
     if not answers or not answers["selected_presets"]:
@@ -219,11 +301,12 @@ def export_presets() -> None:
 
     export_data = []
     for preset in selected_presets:
+        # Fix: Decode preset_data when exporting
         export_data.append(
             {
                 "name": preset["name"],
                 "type": preset["type"],
-                "preset_data": json.loads(preset["preset_data"]),
+                "preset_data": json.loads(preset["preset_data"]),  # Decode for export
             }
         )
 
@@ -242,7 +325,6 @@ def export_presets() -> None:
 
 def delete_presets() -> None:
     db = get_db()
-
     delete_source = inquirer.list_input(
         "Select delete source",
         choices=["Select from list", "Import from file", "Import from URL", "Cancel"],
@@ -263,9 +345,11 @@ def delete_presets() -> None:
             )
         ]
         answers = inquirer.prompt(questions)
+
         if not answers or not answers["selected_presets"]:
             console.print("No presets selected for deletion.")
             return
+
         presets_to_delete = [
             preset
             for preset in all_presets
@@ -280,7 +364,8 @@ def delete_presets() -> None:
             except Exception as e:
                 console.print(f"[bold red]Error reading file:[/bold red] {str(e)}")
                 return
-        else:  # Import from URL
+        else:
+            # Import from URL
             url = inquirer.text(message="Enter the URL of the JSON file")
             try:
                 response = httpx.get(url)
@@ -310,6 +395,7 @@ def delete_presets() -> None:
     confirm = inquirer.confirm(
         f"Are you sure you want to delete the following presets: {preset_names}? This action is irreversible."
     )
+
     if not confirm:
         console.print("Deletion cancelled.")
         return
@@ -319,42 +405,16 @@ def delete_presets() -> None:
 
     # Perform deletion
     try:
-        with db.conn:  # This automatically manages transactions
+        with db.conn:
+            # This automatically manages transactions
             for preset in presets_to_delete:
                 db.execute("DELETE FROM style_presets WHERE id = ?", [preset["id"]])
-
         console.print(
             f"[green]Successfully deleted {len(presets_to_delete)} presets.[/green]"
         )
     except Exception as e:
         console.print(f"[bold red]Error during deletion:[/bold red] {str(e)}")
         console.print("[yellow]All changes have been rolled back.[/yellow]")
-
-
-def update_preset(preset: Dict[str, Any]) -> None:
-    pass
-
-
-def display_presets(show_defaults: bool, show_all: bool) -> None:
-    presets = get_presets_list(show_defaults, show_all)
-
-    presets_table = create_table(
-        "Available presets",
-        [("ID", "yellow"), ("Name", "white"), ("Prompts", "white")],
-    )
-    for preset in presets:
-        prompts_data = json.loads(preset["preset_data"])
-        prompts_formatted = f"[blue]Positive Prompt: {prompts_data['positive_prompt']}[/blue] \
-             \n[yellow]Negative Prompt: {prompts_data['negative_prompt']}[/yellow]"
-
-        presets_table.add_row(
-            str(preset.get("id", "Unknown UID")),
-            preset.get("name", "Unknown name"),
-            prompts_formatted,
-        )
-
-    console.print(presets_table)
-
 
 # ANCHOR: PRESET FUNCTIONS END
 
@@ -374,8 +434,8 @@ def create_snapshot() -> None:
 
     try:
         # Use SQLite backup API
-        with sqlite3.connect(DATABASE_PATH) as source_conn:
-            with sqlite3.connect(snapshot_path) as dest_conn:
+        with get_db(connection=True) as source_conn:
+            with get_db(connection=True) as dest_conn:
                 source_conn.backup(dest_conn)
 
         snapshots = load_snapshots()
