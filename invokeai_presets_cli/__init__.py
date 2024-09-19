@@ -67,7 +67,7 @@ def get_default_env_locations():
             os.path.expandvars("%APPDATA%\\invokeai-presets-itsjustregi\\.env"),
             os.path.expandvars("%USERPROFILE%\\.invokeai-presets-itsjustregi\\.env"),
             os.path.expandvars("%USERPROFILE%\\.env"),
-            ".env",
+            os.path.abspath(".env"),
         ]
     else:  # Unix-like systems (Linux, macOS)
         return [
@@ -82,12 +82,17 @@ def load_environment_variables() -> None:
     env_locations = get_default_env_locations()
 
     env_path = None
+    env_file_found = False
+
     for path in env_locations:
         env_path = Path(path).expanduser().resolve()
         if env_path.is_file():
             load_dotenv(env_path)
+            env_file_found = True
+            #feedback_message(f"Loaded .env file from: {env_path}", "info")
             break
-    else:
+
+    if not env_file_found:
         feedback_message(
             ".env file not found in any of the following locations:", "warning"
         )
@@ -105,13 +110,11 @@ def load_environment_variables() -> None:
                     message="Enter path for new .env file",
                     default=str(default_path),
                     exists=False,
-                    path_type=inquirer.Path.DIRECTORY,
+                    path_type=inquirer.Path.FILE,
                 )
             ]
             answers = inquirer.prompt(questions)
-            env_path = (
-                Path(answers["env_path"]).expanduser() if answers else default_path
-            )
+            env_path = Path(answers["env_path"]).expanduser() if answers else default_path
             env_path.parent.mkdir(parents=True, exist_ok=True)
             create_env_file(env_path)
             load_dotenv(env_path)
@@ -125,10 +128,11 @@ def load_environment_variables() -> None:
     # Set environment variables
     os.environ["INVOKE_AI_DIR"] = os.getenv("INVOKE_AI_DIR", "")
     os.environ["SNAPSHOTS"] = os.getenv("SNAPSHOTS", "")
-    
-    # for windows
-    os.environ['TERM'] = 'cygwin'
 
+    # Verify that required variables are set
+    if not os.environ["INVOKE_AI_DIR"]:
+        feedback_message("INVOKE_AI_DIR is not set in the .env file. Please set it manually.", "error")
+        exit()
 
 # Load environment variables
 load_environment_variables()
