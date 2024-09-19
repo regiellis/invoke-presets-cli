@@ -324,33 +324,45 @@ def export_presets() -> None:
     if not presets:
         console.print("[yellow]No presets found to export.[/yellow]")
         return
+    export_source = inquirer.list_input(
+        "Select export source",
+        choices=["Export selected", "Export all", "Cancel"],
+    )
 
-    choices = [f"{preset['name']} (ID: {preset['id']})" for preset in presets]
-    questions = [
-        inquirer.Checkbox(
-            "selected_presets", message="Select presets to export", choices=choices
-        )
-    ]
-    answers = inquirer.prompt(questions)
-
-    if not answers or not answers["selected_presets"]:
+    if export_source == "Cancel":
         console.print("Export cancelled.")
         return
 
-    selected_presets = [
-        preset
-        for preset in presets
-        if f"{preset['name']} (ID: {preset['id']})" in answers["selected_presets"]
-    ]
+    if export_source == "Export all":
+        selected_presets = presets
+    elif export_source == "Export selected":
+        # Create choices for the inquirer prompt
+        choices = [f"{preset[1]} (ID: {preset[0]})" for preset in presets]
+        questions = [
+            inquirer.Checkbox(
+                "selected_presets", message="Select presets to export", choices=choices
+            )
+        ]
+        answers = inquirer.prompt(questions)
+
+        if not answers or not answers["selected_presets"]:
+            console.print("Export cancelled.")
+            return
+
+        selected_presets = [
+            preset
+            for preset in presets
+            if f"{preset[1]} (ID: {preset[0]})" in answers["selected_presets"]
+        ]
 
     export_data = []
     for preset in selected_presets:
         # Fix: Decode preset_data when exporting
         export_data.append(
             {
-                "name": preset["name"],
-                "type": preset["type"],
-                "preset_data": json.loads(preset["preset_data"]),  # Decode for export
+                "name": preset[1],
+                "type": preset[3],
+                "preset_data": json.loads(preset[2]),  # Decode for export
             }
         )
 
@@ -382,7 +394,7 @@ def delete_presets() -> None:
 
     if delete_source == "Select from list":
         all_presets = get_presets_list(show_defaults=False, show_all=True)
-        #TODO: Refactor ...
+        # TODO: Refactor ...
         choices = [f"{preset[1]} (ID: {preset[0]})" for preset in all_presets]
         questions = [
             inquirer.Checkbox(
@@ -398,7 +410,7 @@ def delete_presets() -> None:
         presets_to_delete = [
             preset
             for preset in all_presets
-            #TODO: Refactor
+            # TODO: Refactor
             if f"{preset[1]} (ID: {preset[0]})" in answers["selected_presets"]
         ]
     elif delete_source in ["Import from file", "Import from URL"]:
@@ -428,10 +440,10 @@ def delete_presets() -> None:
             return
 
         user_presets = get_presets_list(show_defaults=False, show_all=False)
-        
+
         presets_to_delete = [
-            #TODO: This brittle ASF...need to stop using tuples for this or start unpacking the, but for now, it works
-            preset 
+            # TODO: This brittle ASF...need to stop using tuples for this or start unpacking the, but for now, it works
+            preset
             for preset in user_presets
         ]
 
