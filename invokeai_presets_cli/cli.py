@@ -35,15 +35,20 @@ $ pipx install invoke-presets (recommended)
 $ pipx install . (if you want to install it globally)
 $ pip install -e . (if you want to install it locally and poke around, 
 make sure to create a virtual environment)
-$ invoke-styles [OPTIONS] [COMMAND] [ARGS]
+$ invoke-presets [OPTIONS] [COMMAND] [ARGS]
 
-Options:
-    
-    --help                                             Show this message and exit.
+Commands:
 
-Examples:
-
-$ invoke-styles 
+invoke-presets about --readme --changelog --version [-c, -r, -v]
+invoke-presets list [--all, --only-defaults]
+invoke-presets database create-snapshot
+invoke-presets database list-snapshots
+invoke-presets database delete-snapshot
+invoke-presets database restore-snapshot
+invoke-presets tools
+invoke-presets export 
+invoke-presets import 
+invoke-presets delete
 """
 
 __all__ = ["invoke_presets_cli"]
@@ -123,8 +128,16 @@ def styles_list_command(
             show_default="False",
         ),
     ] = False,
+    show_project: Annotated[
+        bool,
+        typer.Option(
+            "--projects",
+            help="Show project presets.",
+            show_default="False",
+        ),
+    ] = False,
 ):
-    display_presets(show_defaults, show_all)
+    display_presets(show_defaults, show_all, show_project)
 
 
 @invoke_presets_cli.command("about", help="Functions for information on this tool.")

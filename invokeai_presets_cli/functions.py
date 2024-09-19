@@ -14,8 +14,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 import sqlite3
-from sqlite3 import Cursor
-from .helpers import feedback_message, create_table, add_rows_to_table, random_name
+from .helpers import feedback_message, create_table, random_name
 
 from rich.markdown import Markdown
 from rich.progress import Progress
@@ -45,22 +44,24 @@ __all__ = [
 
 
 def get_db(connection: bool) -> Any:
+    database = sqlite3.connect(DATABASE_PATH)
     if connection:
-        return sqlite3.connect(DATABASE_PATH)
+        return database
 
-    return sqlite3.connect(DATABASE_PATH).cursor()
+    return database.cursor()
 
 
 # ANCHOR: PRESET FUNCTIONS START
-def get_presets_list(show_defaults: bool, show_all: bool) -> List[Dict[str, Any]]:
+def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool) -> List[Dict[str, Any]]:
     db = get_db(connection=True)
     base_query = "SELECT * FROM style_presets"
     conditions = {
-        (False, False): "WHERE type = 'user'",
-        (False, True): "",
-        (True, False): "WHERE type = 'default'",
+        (False, True, False): "",
+        (False, False, False): "WHERE type = 'user'",
+        (True, False, False): "WHERE type = 'default'",
+        (False, False, True): "WHERE type = 'project'",
     }
-    condition = conditions.get((show_defaults, show_all), "WHERE type = 'default'")
+    condition = conditions.get((show_defaults, show_all, show_project), "WHERE type = 'default'")
     query = f"{base_query} {condition}".strip()
     return list(db.execute(query))
 
@@ -294,15 +295,17 @@ def validate_preset(preset: Dict[str, Any]) -> bool:
     return True
 
 
-def display_presets(show_defaults: bool, show_all: bool) -> None:
-    presets = get_presets_list(show_defaults, show_all)
+def display_presets(show_defaults: bool, show_all: bool, show_project: bool) -> None:
+    presets = get_presets_list(show_defaults, show_all, show_project)
     presets_table = create_table(
-        "Available presets",
+        "",
         [("ID", "yellow"), ("Name", "white"), ("Prompts", "white")],
     )
 
     if not presets:
-        feedback_message("No presets found", "warning")
+        types = [t for t, flag in zip(['default', 'all', 'project'], [show_defaults, show_all, show_project]) if flag]
+        display_type = ' or '.join(types) if types else 'user'
+        feedback_message(f"No presets found for {display_type}", "warning")
         return
 
     for preset in presets:
@@ -505,7 +508,9 @@ def create_snapshot() -> None:
             source_conn.backup(dest_conn)
 
         snapshots = load_snapshots()
-        snapshots.append({"name": snapshot_name, "timestamp": timestamp})
+        snapshots.append(
+            {"name": snapshot_name, "timestamp": timestamp, "path": snapshot_path}
+        )
 
         if len(snapshots) > int(SNAPSHOTS):
             oldest_snapshot = snapshots.pop(0)
@@ -552,10 +557,12 @@ def list_snapshots() -> None:
 
     snapshots_table = create_table(
         "Database Snapshots",
-        [("Name", "white"), ("Timestamp", "yellow dim")],
+        [("Name", "white"), ("Timestamp", "yellow dim"), ("Path", "white")],
     )
     for snapshot in snapshots:
-        snapshots_table.add_row(snapshot["name"], snapshot["timestamp"])
+        snapshots_table.add_row(
+            snapshot["name"], snapshot["timestamp"], snapshot["path"]
+        )
     console.print(snapshots_table)
 
 

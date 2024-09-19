@@ -89,7 +89,7 @@ def load_environment_variables() -> None:
         if env_path.is_file():
             load_dotenv(env_path)
             env_file_found = True
-            #feedback_message(f"Loaded .env file from: {env_path}", "info")
+            # feedback_message(f"Loaded .env file from: {env_path}", "info")
             break
 
     if not env_file_found:
@@ -114,7 +114,9 @@ def load_environment_variables() -> None:
                 )
             ]
             answers = inquirer.prompt(questions)
-            env_path = Path(answers["env_path"]).expanduser() if answers else default_path
+            env_path = (
+                Path(answers["env_path"]).expanduser() if answers else default_path
+            )
             env_path.parent.mkdir(parents=True, exist_ok=True)
             create_env_file(env_path)
             load_dotenv(env_path)
@@ -131,8 +133,12 @@ def load_environment_variables() -> None:
 
     # Verify that required variables are set
     if not os.environ["INVOKE_AI_DIR"]:
-        feedback_message("INVOKE_AI_DIR is not set in the .env file. Please set it manually.", "error")
+        feedback_message(
+            "INVOKE_AI_DIR is not set in the .env file. Please set it manually.",
+            "error",
+        )
         exit()
+
 
 # Load environment variables
 load_environment_variables()
