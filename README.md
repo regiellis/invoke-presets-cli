@@ -1,4 +1,4 @@
-# Invoke Preset CLI
+# InvokeAI Preset CLI
 
 
 > [!IMPORTANT]

@@ -13,6 +13,7 @@ from .functions import (
     export_presets,
     import_presets,
     delete_presets,
+    about_cli
 )
 
 from rich.traceback import install
@@ -127,8 +128,23 @@ def styles_list_command(
 
 
 @invoke_styles_cli.command("about", help="Functions for information on this tool.")
-def about_command():
-    pass
-
-
-ensure_snapshots_dir()
+def about_command(
+    readme: bool = typer.Option(
+        True, "--readme", "-r", help="Show the README.md content"
+    ),
+    changelog: bool = typer.Option(
+        False, "--changelog", "-c", help="Show the CHANGELOG.md content"
+    ),
+    version: bool = typer.Option(
+        False, "--version", "-v", help="Show the current version",
+    ),
+):
+    """
+    Show README.md and/or CHANGELOG.md content.
+    """
+    
+    if version:
+        typer.echo(f"InvokeAI Preset CLI version: {__version__}", color=True)
+        return
+    
+    about_cli(readme, changelog)

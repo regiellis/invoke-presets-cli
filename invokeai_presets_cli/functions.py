@@ -3,18 +3,24 @@ import json
 import uuid
 import httpx
 import shutil
+import inquirer
+import typer
+import importlib.resources
+
+import tempfile
+
+from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 import sqlite3
 from sqlite3 import Cursor
-import inquirer
-
 from .helpers import feedback_message, create_table, add_rows_to_table, random_name
 
-from . import INVOKE_AI_DIR, SNAPSHOTS
-
+from rich.markdown import Markdown
 from rich.console import Console
+
+from . import INVOKE_AI_DIR, SNAPSHOTS
 
 console = Console()
 
@@ -667,8 +673,57 @@ def ensure_snapshots_dir():
 
 
 # ANCHOR: ABOUT FUNCTIONS START
-def about() -> None:
-    pass
+
+def display_readme(requested_file: str) -> None:
+
+    readme_path = Path(requested_file)
+
+    if readme_path.exists():
+        with readme_path.open("r", encoding="utf-8") as f:
+            markdown_content = f.read()
+
+        md = Markdown(markdown_content)
+        console.print(md)
+    else:
+        typer.echo(f"{requested_file} not found in the current directory.")
+        
+def about_cli(readme: bool, changelog: bool) -> None:
+    documents: List[str] = []
+    if readme:
+        documents.append("README.md")
+    if changelog:
+        documents.append("CHANGELOG.md")
+    if not documents:
+        feedback_message(
+            "No document specified. please --readme [-r] or --changelog [-c]", "warning"
+        )
+
+    for document in documents:
+        try:
+            # Try to get the file content from the package resources
+            with importlib.resources.open_text("civitai_models_manager", document) as f:
+                content = f.read()
+            # Create a temporary file to pass to display_readme
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".md"
+            ) as temp_file:
+                temp_file.write(content)
+                temp_file_path = temp_file.name
+            display_readme(temp_file_path)
+            # Remove the temporary file
+            Path(temp_file_path).unlink()
+        except (FileNotFoundError, ImportError, ModuleNotFoundError):
+            # If not found in package resources, try the current directory
+            local_path = Path(document)
+            if local_path.exists():
+                display_readme(str(local_path))
+            else:
+                # Try one directory up
+                parent_path = local_path.parent.parent / document
+                if parent_path.exists():
+                    display_readme(str(parent_path))
+                else:
+                    typer.echo(f"{document} not found.")
 
 
 # ANCHOR: ABOUT FUNCTIONS END

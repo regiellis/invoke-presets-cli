@@ -56,5 +56,5 @@ Documentation = "https://github.com/regiellis/invokeai_presets_cli/blob/main/REA
 "Bug Tracker" = "https://github.com/regiellis/invokeai_presets_cli/issues"
 
 [project.scripts]
-invoke-presets = "invokeai_presets_cli.__main__:main"
+invokeai-presets = "invokeai_presets_cli.__main__:main"
 
