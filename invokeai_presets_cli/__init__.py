@@ -3,6 +3,7 @@ import inquirer
 from pathlib import Path
 from typing import Final
 from dotenv import load_dotenv, set_key
+import typer
 
 from .helpers import feedback_message
 
@@ -117,7 +118,11 @@ def load_environment_variables() -> None:
         create_env_file(env_path)
         load_dotenv(env_path)
     else:
-        raise FileNotFoundError("No .env file found and user chose not to create one.")
+        feedback_message(
+            "No .env file found and user chose not to create one. Exiting.",
+            "error",
+        )
+        exit()
 
 
 # use
