@@ -13,6 +13,7 @@ entries of presets into the Invoke AI. The tool was primarily designed to allow 
 add, update, and delete presets in bulk.
 
 Presets/styles can be found at the [gist.github.com/regiellis](https://gist.github.com/regiellis/af5fc6a046d69d62036c6e9be2ff08da)
+make sure to use the raw link to import the styles.
 
 These styles are re-post of the work from the great people at:
 [twri](https://github.com/twri), [3Diva](https://github.com/3Diva), [Marc K3nt3L](https://github.com/K3nt3L), and the
