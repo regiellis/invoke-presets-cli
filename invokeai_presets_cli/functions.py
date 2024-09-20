@@ -57,7 +57,13 @@ def get_db(connection: bool) -> Any:
 
 
 # ANCHOR: PRESET FUNCTIONS START
-def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool, page: int = 1, items_per_page: int = 10) -> Tuple[int, List[Dict[str, Any]]]:
+def get_presets_list(
+    show_defaults: bool,
+    show_all: bool,
+    show_project: bool,
+    page: int = 1,
+    items_per_page: int = 10,
+) -> Tuple[int, List[Dict[str, Any]]]:
     db = get_db(connection=True)
     base_query = "SELECT * FROM style_presets"
     conditions = {
@@ -66,8 +72,10 @@ def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool, pa
         (True, False, False): "WHERE type = 'default'",
         (False, False, True): "WHERE type = 'project'",
     }
-    condition = conditions.get((show_defaults, show_all, show_project), "WHERE type = 'default'")
-    
+    condition = conditions.get(
+        (show_defaults, show_all, show_project), "WHERE type = 'default'"
+    )
+
     # Count total presets
     count_query = f"SELECT COUNT(*) FROM style_presets {condition}".strip()
     total_presets = db.execute(count_query).fetchone()[0]
@@ -79,8 +87,13 @@ def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool, pa
 
     return total_presets, presets
 
-def get_preset_page_count(show_defaults: bool, show_all: bool, show_project: bool, items_per_page: int = 10) -> int:
-    total_presets, _ = get_presets_list(show_defaults, show_all, show_project, 1, items_per_page)
+
+def get_preset_page_count(
+    show_defaults: bool, show_all: bool, show_project: bool, items_per_page: int = 10
+) -> int:
+    total_presets, _ = get_presets_list(
+        show_defaults, show_all, show_project, 1, items_per_page
+    )
     return math.ceil(total_presets / items_per_page)
 
 
@@ -164,7 +177,9 @@ def import_presets(project_type: bool) -> None:
     db = get_db(connection=True)
     existing_presets = {
         preset[1]: preset  # Tuple // name is 1st element
-        for preset in get_presets_list(show_defaults=False, show_all=True, show_project=False)
+        for preset in get_presets_list(
+            show_defaults=False, show_all=True, show_project=False
+        )
     }
     presets_to_update = []
     presets_to_create = []
@@ -272,7 +287,9 @@ def convert_preset_format(preset: Dict[str, Any], project_type) -> Dict[str, Any
     # Convert from the new format to the database format
     return {
         "name": preset["name"],
-        "type": "project" if project_type else preset.get("type", "user"),  # Default to 'user' if not specified
+        "type": (
+            "project" if project_type else preset.get("type", "user")
+        ),  # Default to 'user' if not specified
         "preset_data": {
             "positive_prompt": preset.get("positive_prompt", preset.get("prompt", "")),
             "negative_prompt": preset.get("negative_prompt", ""),
@@ -313,8 +330,16 @@ def validate_preset(preset: Dict[str, Any]) -> bool:
     return True
 
 
-def display_presets(show_defaults: bool, show_all: bool, show_project: bool, page: int = 1, items_per_page: int = 10) -> None:
-    total_presets, presets = get_presets_list(show_defaults, show_all, show_project, page, items_per_page)
+def display_presets(
+    show_defaults: bool,
+    show_all: bool,
+    show_project: bool,
+    page: int = 1,
+    items_per_page: int = 10,
+) -> None:
+    total_presets, presets = get_presets_list(
+        show_defaults, show_all, show_project, page, items_per_page
+    )
     total_pages = math.ceil(total_presets / items_per_page)
 
     presets_table = create_table(
@@ -323,7 +348,17 @@ def display_presets(show_defaults: bool, show_all: bool, show_project: bool, pag
     )
 
     if not presets:
-        types = ' or '.join(t for t, f in zip(['default', 'all', 'project'], [show_defaults, show_all, show_project]) if f) or 'user'
+        types = (
+            " or ".join(
+                t
+                for t, f in zip(
+                    ["default", "all", "project"],
+                    [show_defaults, show_all, show_project],
+                )
+                if f
+            )
+            or "user"
+        )
         feedback_message(f"No presets found for {types}", "warning")
         return
 
@@ -342,16 +377,23 @@ def display_presets(show_defaults: bool, show_all: bool, show_project: bool, pag
 
     if total_pages > 1:
         while True:
-            choice = typer.prompt("Enter 'n' for next page, 'p' for previous page, or 'q' to quit", default="q")
-            if choice.lower() == 'n' and page < total_pages:
+            choice = typer.prompt(
+                "Enter 'n' for next page, 'p' for previous page, or 'q' to quit",
+                default="q",
+            )
+            if choice.lower() == "n" and page < total_pages:
                 page += 1
-                display_presets(show_defaults, show_all, show_project, page, items_per_page)
+                display_presets(
+                    show_defaults, show_all, show_project, page, items_per_page
+                )
                 break
-            elif choice.lower() == 'p' and page > 1:
+            elif choice.lower() == "p" and page > 1:
                 page -= 1
-                display_presets(show_defaults, show_all, show_project, page, items_per_page)
+                display_presets(
+                    show_defaults, show_all, show_project, page, items_per_page
+                )
                 break
-            elif choice.lower() == 'q':
+            elif choice.lower() == "q":
                 break
             else:
                 console.print("Invalid choice. Please try again.")
@@ -431,7 +473,9 @@ def delete_presets() -> None:
     presets_to_delete = []
 
     if delete_source == "Select from list":
-        all_presets = get_presets_list(show_defaults=False, show_all=True, show_project=False)
+        all_presets = get_presets_list(
+            show_defaults=False, show_all=True, show_project=False
+        )
         # TODO: Refactor ...
         choices = [f"{preset[1]} (ID: {preset[0]})" for preset in all_presets]
         questions = [
@@ -477,8 +521,10 @@ def delete_presets() -> None:
             )
             return
 
-        #TODO: This is sticky...need to refactor
-        user_presets = get_presets_list(show_defaults=False, show_all=False, show_project=False)
+        # TODO: This is sticky...need to refactor
+        user_presets = get_presets_list(
+            show_defaults=False, show_all=False, show_project=False
+        )
 
         presets_to_delete = [
             # TODO: This brittle ASF...need to stop using tuples for this or start unpacking the, but for now, it works

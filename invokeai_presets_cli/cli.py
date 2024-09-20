@@ -105,7 +105,7 @@ def styles_import_command(
             help="The type of preset to import, either 'user' or 'project'. Default is 'user'",
             show_default="False",
         ),
-    ]=False
+    ] = False
 ):
     import_presets(project_type)
 
