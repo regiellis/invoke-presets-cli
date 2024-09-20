@@ -146,8 +146,24 @@ def styles_list_command(
             show_default="False",
         ),
     ] = False,
+    page: Annotated[
+        int,
+        typer.Option(
+            "--page",
+            help="Page number to display.",
+            show_default="1",
+        ),
+    ] = 1,
+    items_per_page: Annotated[
+        int,
+        typer.Option(
+            "--items-per-page",
+            help="Number of items to display per page.",
+            show_default="10",
+        ),
+    ] = 10,
 ):
-    display_presets(show_defaults, show_all, show_project)
+    display_presets(show_defaults, show_all, show_project, page, items_per_page)
 
 
 @invoke_presets_cli.command("about", help="Functions for information on this tool.")

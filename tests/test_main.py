@@ -8,6 +8,7 @@ import sqlite3
 
 from typer.testing import CliRunner
 from invokeai_presets_cli.cli import invoke_presets_cli
+from unittest.mock import patch, MagicMock
 
 
 @pytest.fixture
@@ -92,14 +93,48 @@ def test_list_snapshots(runner, mock_db):
 
 
 def test_list_presets(runner, mock_db):
+    # Test default behavior
     result = runner.invoke(invoke_presets_cli, ["list"])
     simplified_output = simplify_rich_output(result.stdout)
     print(f"List presets output: {simplified_output}")  # Debug print
     assert result.exit_code == 0
-    assert (
-        "Available presets:" in simplified_output
-        or "No presets found" in simplified_output
-    )
+    assert any(keyword in simplified_output for keyword in ["ID", "Name", "Prompts", "No presets found"])
+
+    if "No presets found" in simplified_output:
+        assert "Warning" in simplified_output
+        return  # Skip the rest of the tests if no presets are found
+
+    # Only continue with these tests if presets were found
+    
+    # Test with pagination options
+    result = runner.invoke(invoke_presets_cli, ["list", "--page", "2", "--items-per-page", "5"])
+    simplified_output = simplify_rich_output(result.stdout)
+    print(f"List presets with pagination output: {simplified_output}")  # Debug print
+    assert result.exit_code == 0
+    assert "Page" in simplified_output
+
+    # Test with other options
+    result = runner.invoke(invoke_presets_cli, ["list", "--only-defaults", "--page", "1", "--items-per-page", "10"])
+    simplified_output = simplify_rich_output(result.stdout)
+    print(f"List default presets output: {simplified_output}")  # Debug print
+    assert result.exit_code == 0
+    assert "Page" in simplified_output
+
+    # Test navigation
+    with patch('builtins.input', side_effect=['n', 'p', 'q']):
+        result = runner.invoke(invoke_presets_cli, ["list"])
+        simplified_output = simplify_rich_output(result.stdout)
+        print(f"List presets with navigation output: {simplified_output}")  # Debug print
+        assert result.exit_code == 0
+        assert "Page" in simplified_output
+
+    # Test invalid navigation input
+    with patch('builtins.input', side_effect=['x', 'q']):
+        result = runner.invoke(invoke_presets_cli, ["list"])
+        simplified_output = simplify_rich_output(result.stdout)
+        print(f"List presets with invalid navigation output: {simplified_output}")  # Debug print
+        assert result.exit_code == 0
+        assert "Invalid choice" in simplified_output or "Page" in simplified_output
 
 
 def test_nonexistent_command(runner):

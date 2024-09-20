@@ -1,17 +1,18 @@
-import os
-import json
 import uuid
-import httpx
-import shutil
-import inquirer
 import typer
+import shutil
+import os
+import math
+import json
+import inquirer
+import httpx
 import importlib.resources
 
 import tempfile
 
 from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Tuple, Optional
 
 import sqlite3
 from .helpers import feedback_message, create_table, random_name
@@ -19,6 +20,10 @@ from .helpers import feedback_message, create_table, random_name
 from rich.markdown import Markdown
 from rich.progress import Progress
 from rich.console import Console
+
+from rich.traceback import install
+
+install()
 
 from . import INVOKE_AI_DIR, SNAPSHOTS
 
@@ -52,18 +57,31 @@ def get_db(connection: bool) -> Any:
 
 
 # ANCHOR: PRESET FUNCTIONS START
-def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool) -> List[Dict[str, Any]]:
+def get_presets_list(show_defaults: bool, show_all: bool, show_project: bool, page: int = 1, items_per_page: int = 10) -> Tuple[int, List[Dict[str, Any]]]:
     db = get_db(connection=True)
     base_query = "SELECT * FROM style_presets"
     conditions = {
         (False, True, False): "",
-        (False, False, False):"WHERE type = 'user'",
+        (False, False, False): "WHERE type = 'user'",
         (True, False, False): "WHERE type = 'default'",
         (False, False, True): "WHERE type = 'project'",
     }
     condition = conditions.get((show_defaults, show_all, show_project), "WHERE type = 'default'")
-    query = f"{base_query} {condition}".strip()
-    return list(db.execute(query))
+    
+    # Count total presets
+    count_query = f"SELECT COUNT(*) FROM style_presets {condition}".strip()
+    total_presets = db.execute(count_query).fetchone()[0]
+
+    # Fetch paginated presets
+    offset = (page - 1) * items_per_page
+    query = f"{base_query} {condition} LIMIT ? OFFSET ?".strip()
+    presets = list(db.execute(query, (items_per_page, offset)))
+
+    return total_presets, presets
+
+def get_preset_page_count(show_defaults: bool, show_all: bool, show_project: bool, items_per_page: int = 10) -> int:
+    total_presets, _ = get_presets_list(show_defaults, show_all, show_project, 1, items_per_page)
+    return math.ceil(total_presets / items_per_page)
 
 
 def import_presets(project_type: bool) -> None:
@@ -295,8 +313,10 @@ def validate_preset(preset: Dict[str, Any]) -> bool:
     return True
 
 
-def display_presets(show_defaults: bool, show_all: bool, show_project: bool) -> None:
-    presets = get_presets_list(show_defaults, show_all, show_project)
+def display_presets(show_defaults: bool, show_all: bool, show_project: bool, page: int = 1, items_per_page: int = 10) -> None:
+    total_presets, presets = get_presets_list(show_defaults, show_all, show_project, page, items_per_page)
+    total_pages = math.ceil(total_presets / items_per_page)
+
     presets_table = create_table(
         "",
         [("ID", "yellow"), ("Name", "white"), ("Prompts", "white")],
@@ -308,7 +328,6 @@ def display_presets(show_defaults: bool, show_all: bool, show_project: bool) -> 
         return
 
     for preset in presets:
-        # Fix: Decode preset_data before using it for display
         prompts_data = json.loads(preset[2])
         prompts_formatted = f"[blue]Positive Prompt: {prompts_data['positive_prompt']}[/blue] \
         \n[yellow]Negative Prompt: {prompts_data['negative_prompt']}[/yellow]"
@@ -319,6 +338,23 @@ def display_presets(show_defaults: bool, show_all: bool, show_project: bool) -> 
         )
 
     console.print(presets_table)
+    console.print(f"Page {page} of {total_pages}")
+
+    if total_pages > 1:
+        while True:
+            choice = typer.prompt("Enter 'n' for next page, 'p' for previous page, or 'q' to quit", default="q")
+            if choice.lower() == 'n' and page < total_pages:
+                page += 1
+                display_presets(show_defaults, show_all, show_project, page, items_per_page)
+                break
+            elif choice.lower() == 'p' and page > 1:
+                page -= 1
+                display_presets(show_defaults, show_all, show_project, page, items_per_page)
+                break
+            elif choice.lower() == 'q':
+                break
+            else:
+                console.print("Invalid choice. Please try again.")
 
 
 def export_presets() -> None:
