@@ -1,5 +1,9 @@
 # InvokeAI Preset CLI
 
+> [!WARNING]
+> Currently importing and deleteing presets...are broken due to a subsciptable error...I am aware of it and will fix it when I can.
+> I will remove this warning once fixed
+
 > [!IMPORTANT]
 > This tool makes changes to the Invoke AI database and while it does make snapshots before operations
 > that write to a table, there is always a chance the data could become corrupted. Use stand-alone tools
