@@ -60,7 +60,6 @@ def map_presets() -> Dict[str, List[Tuple[str, str]]]:
         return {}
     return preset_map
 
-
 # ANCHOR: PRESET FUNCTIONS START
 
 

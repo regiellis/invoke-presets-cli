@@ -4,7 +4,6 @@ from typing_extensions import Annotated
 
 
 from .functions import (
-    ensure_snapshots_dir,
     display_presets,
     list_snapshots,
     delete_snapshot,
