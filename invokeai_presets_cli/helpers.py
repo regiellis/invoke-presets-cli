@@ -3,18 +3,30 @@ import typer
 import random
 
 import tempfile
+import sqlite3
 
 from typing import Dict, Any
 from rich.console import Console
 from rich.table import Table
 
+
+from rich.traceback import install
+
+install()
+
+from . import SNAPSHOTS, DATABASE_PATH, SNAPSHOTS_DIR, SNAPSHOTS_JSON
+
+
 console = Console(soft_wrap=True)
 
-__all__ = ["feedback_message", "create_table", "add_rows_to_table", "random_name"]
+__all__ = [
+    "feedback_message",
+    "create_table",
+    "add_rows_to_table",
+    "random_name"
+]
 
 
-
-# function that creates random names and rturns them
 def random_name(num_words: int = 2, separator: str = "_") -> str:
     adjectives = [
         "happy",
@@ -123,3 +135,10 @@ def add_rows_to_table(table: Table, data: Dict[str, Any]) -> None:
         if isinstance(value, list):
             value = ", ".join(map(str, value))
         table.add_row(key, str(value))
+
+
+def get_db(connection: bool) -> Any:
+    database = sqlite3.connect(DATABASE_PATH)
+    if connection:
+        return database
+    return database.cursor()

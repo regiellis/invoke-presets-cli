@@ -161,10 +161,12 @@ def create_snapshot_directory() -> bool:
         return True
 
     except PermissionError:
-        raise PermissionError(f"You don't have permission to create directories in {SNAPSHOTS_DIR}")
+        raise PermissionError(
+            f"You don't have permission to create directories in {SNAPSHOTS_DIR}"
+        )
 
     except OSError as e:
         raise OSError(f"An error occurred while creating the snapshot directory: {e}")
-    
-    
+
+
 create_snapshot_directory()

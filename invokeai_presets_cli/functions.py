@@ -15,7 +15,12 @@ from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
 
 import sqlite3
-from .helpers import feedback_message, create_table, random_name
+from .helpers import (
+    get_db,
+    feedback_message,
+    create_table,
+    random
+)
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -24,12 +29,7 @@ from rich.traceback import install
 
 install()
 
-from . import ( 
-    SNAPSHOTS,
-    DATABASE_PATH,
-    SNAPSHOTS_DIR,
-    SNAPSHOTS_JSON
-)
+from . import SNAPSHOTS, DATABASE_PATH, SNAPSHOTS_DIR, SNAPSHOTS_JSON
 
 console = Console()
 
@@ -45,12 +45,25 @@ __all__ = [
 ]
 
 
-def get_db(connection: bool) -> Any:
-    database = sqlite3.connect(DATABASE_PATH)
-    if connection:
-        return database
-
-    return database.cursor()
+def map_presets() -> Dict[str, List[Tuple[str, str]]]:
+    db = get_db(connection=True)
+    preset_types = ["user", "project", "default"]
+    preset_map = {preset_type: [] for preset_type in preset_types}
+    try:
+        with db:
+            cursor = db.cursor()
+            for preset_type in preset_types:
+                cursor.execute(
+                    "SELECT id, name FROM style_presets WHERE type = ?", (preset_type,)
+                )
+                presets = cursor.fetchall()
+                preset_map[preset_type] = [
+                    (str(preset[0]), preset[1]) for preset in presets
+                ]
+    except Exception as e:
+        console.print(f"[bold red]Error mapping presets:[/bold red] {str(e)}")
+        return {}
+    return preset_map
 
 
 # ANCHOR: PRESET FUNCTIONS START
@@ -281,6 +294,7 @@ def convert_preset_format(preset: Dict[str, Any], project_type) -> Dict[str, Any
     if "preset_data" in preset:
         # Already in the correct format
         return preset
+
     # Convert from the new format to the database format
     return {
         "name": preset["name"],
@@ -401,6 +415,7 @@ def export_presets() -> None:
     if not presets:
         console.print("[yellow]No presets found to export.[/yellow]")
         return
+
     export_source = inquirer.list_input(
         "Select export source",
         choices=["Export selected", "Export all", "Cancel"],
@@ -422,11 +437,9 @@ def export_presets() -> None:
             )
         ]
         answers = inquirer.prompt(questions)
-
         if not answers or not answers["selected_presets"]:
             console.print("Export cancelled.")
             return
-
         selected_presets = [
             preset
             for preset in presets[1]
@@ -448,7 +461,6 @@ def export_presets() -> None:
         message="Enter the export filename (without extension)"
     )
     export_path = f"{export_filename}.json"
-
     try:
         with open(export_path, "w") as f:
             json.dump(export_data, f, indent=2)
@@ -474,8 +486,7 @@ def delete_presets() -> None:
         all_presets = get_presets_list(
             show_defaults=False, show_all=False, show_project=False
         )
-
-        # TODO: Refactor ...
+        # Assume all_presets[1] is the actual list of presets
         choices = [f"{preset[1]} (ID: {preset[0]})" for preset in all_presets[1]]
         questions = [
             inquirer.Checkbox(
@@ -490,11 +501,11 @@ def delete_presets() -> None:
 
         presets_to_delete = [
             preset
-            for preset in all_presets
-            # TODO: Refactor
+            for preset in all_presets[1]
             if f"{preset[1]} (ID: {preset[0]})" in answers["selected_presets"]
         ]
     elif delete_source in ["Import from file", "Import from URL"]:
+        preset_names = []
         if delete_source == "Import from file":
             file_path = inquirer.text(message="Enter the path to the JSON file")
             try:
@@ -520,15 +531,12 @@ def delete_presets() -> None:
             )
             return
 
-        # TODO: This is sticky...need to refactor
         user_presets = get_presets_list(
             show_defaults=False, show_all=False, show_project=False
         )
 
         presets_to_delete = [
-            # TODO: This brittle ASF...need to stop using tuples for this or start unpacking the, but for now, it works
-            preset
-            for preset in user_presets
+            preset for preset in user_presets[1] if preset[1] in preset_names
         ]
 
     if not presets_to_delete:
@@ -536,7 +544,7 @@ def delete_presets() -> None:
         return
 
     # Confirmation
-    preset_names = ", ".join([preset[1] for preset in presets_to_delete[1]])
+    preset_names = ", ".join([preset[1] for preset in presets_to_delete])
     confirm = inquirer.confirm(
         f"Are you sure you want to delete the following presets: {preset_names}? This action is irreversible."
     )
@@ -552,8 +560,8 @@ def delete_presets() -> None:
     try:
         with db:
             # This automatically manages transactions
-            for preset in presets_to_delete[1]:
-                db.execute("DELETE FROM style_presets WHERE id = ?", [preset[0]])
+            for preset in presets_to_delete:
+                db.execute("DELETE FROM style_presets WHERE id = ?", (preset[0],))
         console.print(
             f"[green]Successfully deleted {len(presets_to_delete)} presets.[/green]"
         )
@@ -846,7 +854,7 @@ def about_cli(readme: bool, changelog: bool) -> None:
     for document in documents:
         try:
             # Try to get the file content from the package resources
-            with importlib.resources.open_text("civitai_models_manager", document) as f:
+            with importlib.resources.open_text("invokeai_presets_cli", document) as f:
                 content = f.read()
             # Create a temporary file to pass to display_readme
             with tempfile.NamedTemporaryFile(
