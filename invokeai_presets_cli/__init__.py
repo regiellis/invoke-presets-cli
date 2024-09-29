@@ -174,4 +174,3 @@ def create_snapshot_directory() -> bool:
 
 
 create_snapshot_directory()
-

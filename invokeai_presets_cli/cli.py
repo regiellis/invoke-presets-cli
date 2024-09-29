@@ -63,10 +63,6 @@ invoke_presets_cli.add_typer(
     help="Manage the snapshots of the Invoke AI database.",
     no_args_is_help=True,
 )
-invoke_presets_cli.add_typer(
-    utils_cli, name="tools", help="Utilities.", no_args_is_help=True
-)
-
 
 @database_cli.command(
     "create-snapshot", help="Create a snapshot of the Invoke AI database."
