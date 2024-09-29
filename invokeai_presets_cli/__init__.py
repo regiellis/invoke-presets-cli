@@ -1,13 +1,17 @@
 import os
 import inquirer
-from pathlib import Path
-from typing import Final
-from dotenv import load_dotenv, set_key
 import typer
 import platform
 import tempfile
 
+from pathlib import Path
+from typing import Final
+from dotenv import load_dotenv, set_key
+from rich.console import Console
+
 from .helpers import feedback_message
+
+console = Console()
 
 
 def get_required_input(prompt: str) -> str:
@@ -169,4 +173,20 @@ def create_snapshot_directory() -> bool:
         raise OSError(f"An error occurred while creating the snapshot directory: {e}")
 
 
+def ensure_snapshots_dir():
+    if not os.path.exists(SNAPSHOTS_DIR):
+        try:
+            os.makedirs(SNAPSHOTS_DIR)
+            console.print(
+                f"[green]Created snapshots directory: {SNAPSHOTS_DIR}[/green]"
+            )
+        except Exception as e:
+            console.print(
+                f"[bold red]Error creating snapshots directory:[/bold red] {str(e)}"
+            )
+            return False
+    return True
+
+
 create_snapshot_directory()
+ensure_snapshots_dir()

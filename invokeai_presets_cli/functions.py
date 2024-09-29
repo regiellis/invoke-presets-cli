@@ -15,12 +15,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
 
 import sqlite3
-from .helpers import (
-    get_db,
-    feedback_message,
-    create_table,
-    random
-)
+from .helpers import get_db, feedback_message, create_table, random_name
 
 from rich.markdown import Markdown
 from rich.console import Console
@@ -46,7 +41,7 @@ __all__ = [
 
 
 def map_presets() -> Dict[str, List[Tuple[str, str]]]:
-    db = get_db(connection=True)
+    db = get_db(DATABASE_PATH, connection=True)
     preset_types = ["user", "project", "default"]
     preset_map = {preset_type: [] for preset_type in preset_types}
     try:
@@ -67,6 +62,8 @@ def map_presets() -> Dict[str, List[Tuple[str, str]]]:
 
 
 # ANCHOR: PRESET FUNCTIONS START
+
+
 def get_presets_list(
     show_defaults: bool,
     show_all: bool,
@@ -74,7 +71,7 @@ def get_presets_list(
     page: int = 1,
     items_per_page: int = 10,
 ) -> Tuple[int, List[Dict[str, Any]]]:
-    db = get_db(connection=True)
+    db = get_db(DATABASE_PATH, connection=True)
     base_query = "SELECT * FROM style_presets"
     conditions = {
         (False, True, False): "",
@@ -184,7 +181,7 @@ def import_presets(project_type: bool) -> None:
     else:  # Import All
         selected_presets = presets_to_import
 
-    db = get_db(connection=True)
+    db = get_db(DATABASE_PATH, connection=True)
     existing_presets = {
         preset[1]: preset
         for preset in get_presets_list(
@@ -470,7 +467,7 @@ def export_presets() -> None:
 
 
 def delete_presets() -> None:
-    db = get_db(connection=True)
+    db = get_db(DATABASE_PATH, connection=True)
     delete_source = inquirer.list_input(
         "Select delete source",
         choices=["Select from list", "Import from file", "Import from URL", "Cancel"],
@@ -591,7 +588,7 @@ def create_snapshot() -> None:
 
         # Use SQLite backup API
         with (
-            get_db(connection=True) as source_conn,
+            get_db(DATABASE_PATH, connection=True) as source_conn,
             sqlite3.connect(snapshot_path) as dest_conn,
         ):
             source_conn.backup(dest_conn)
@@ -805,21 +802,6 @@ def restore_snapshot():
             os.remove(backup_path)
 
 
-def ensure_snapshots_dir():
-    if not os.path.exists(SNAPSHOTS_DIR):
-        try:
-            os.makedirs(SNAPSHOTS_DIR)
-            console.print(
-                f"[green]Created snapshots directory: {SNAPSHOTS_DIR}[/green]"
-            )
-        except Exception as e:
-            console.print(
-                f"[bold red]Error creating snapshots directory:[/bold red] {str(e)}"
-            )
-            return False
-    return True
-
-
 # ANCHOR: DATABASE FUNCTIONS END
 
 
@@ -876,7 +858,7 @@ def about_cli(readme: bool, changelog: bool) -> None:
                 if parent_path.exists():
                     display_readme(str(parent_path))
                 else:
-                    typer.echo(f"{document} not found.")
+                    feedback_message(f"{document} not found.", "warning")
 
 
 # ANCHOR: ABOUT FUNCTIONS END

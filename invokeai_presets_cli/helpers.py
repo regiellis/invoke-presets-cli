@@ -14,17 +14,10 @@ from rich.traceback import install
 
 install()
 
-from . import SNAPSHOTS, DATABASE_PATH, SNAPSHOTS_DIR, SNAPSHOTS_JSON
-
 
 console = Console(soft_wrap=True)
 
-__all__ = [
-    "feedback_message",
-    "create_table",
-    "add_rows_to_table",
-    "random_name"
-]
+__all__ = ["feedback_message", "create_table", "add_rows_to_table", "random_name"]
 
 
 def random_name(num_words: int = 2, separator: str = "_") -> str:
@@ -137,8 +130,8 @@ def add_rows_to_table(table: Table, data: Dict[str, Any]) -> None:
         table.add_row(key, str(value))
 
 
-def get_db(connection: bool) -> Any:
-    database = sqlite3.connect(DATABASE_PATH)
+def get_db(database_path: str, connection: bool) -> Any:
+    database = sqlite3.connect(database_path)
     if connection:
         return database
     return database.cursor()
