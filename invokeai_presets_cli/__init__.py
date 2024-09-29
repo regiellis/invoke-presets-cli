@@ -5,6 +5,7 @@ from typing import Final
 from dotenv import load_dotenv, set_key
 import typer
 import platform
+import tempfile
 
 from .helpers import feedback_message
 
@@ -146,3 +147,24 @@ load_environment_variables()
 # Define constants
 INVOKE_AI_DIR: Final = os.environ["INVOKE_AI_DIR"]
 SNAPSHOTS: Final = os.environ["SNAPSHOTS"]
+
+PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DATABASE_PATH = os.path.join(INVOKE_AI_DIR, "databases", "invokeai.db")
+SNAPSHOTS_DIR = os.path.join(PACKAGE_DIR, "snapshots")
+SNAPSHOTS_JSON = os.path.join(SNAPSHOTS_DIR, "snapshots.json")
+
+
+def create_snapshot_directory() -> bool:
+    try:
+        os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+        return True
+
+    except PermissionError:
+        raise PermissionError(f"You don't have permission to create directories in {SNAPSHOTS_DIR}")
+
+    except OSError as e:
+        raise OSError(f"An error occurred while creating the snapshot directory: {e}")
+    
+    
+create_snapshot_directory()

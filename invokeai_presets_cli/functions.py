@@ -18,23 +18,20 @@ import sqlite3
 from .helpers import feedback_message, create_table, random_name
 
 from rich.markdown import Markdown
-from rich.progress import Progress
 from rich.console import Console
 
 from rich.traceback import install
 
 install()
 
-from . import INVOKE_AI_DIR, SNAPSHOTS
+from . import ( 
+    SNAPSHOTS,
+    DATABASE_PATH,
+    SNAPSHOTS_DIR,
+    SNAPSHOTS_JSON
+)
 
 console = Console()
-
-# Get the package directory
-PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-DATABASE_PATH = os.path.join(INVOKE_AI_DIR, "databases", "invokeai.db")
-SNAPSHOTS_DIR = os.path.join(PACKAGE_DIR, "snapshots")
-SNAPSHOTS_JSON = os.path.join(SNAPSHOTS_DIR, "snapshots.json")
 
 __all__ = [
     "get_presets_list",
@@ -176,10 +173,10 @@ def import_presets(project_type: bool) -> None:
 
     db = get_db(connection=True)
     existing_presets = {
-        preset[1]: preset  # Tuple // name is 1st element
+        preset[1]: preset
         for preset in get_presets_list(
             show_defaults=False, show_all=True, show_project=False
-        )
+        )[1]
     }
     presets_to_update = []
     presets_to_create = []
@@ -417,7 +414,8 @@ def export_presets() -> None:
         selected_presets = presets
     elif export_source == "Export selected":
         # Create choices for the inquirer prompt
-        choices = [f"{preset[1]} (ID: {preset[0]})" for preset in presets]
+        # return print(presets[:5])
+        choices = [f"{preset[1]} (ID: {preset[0]})" for preset in presets[1]]
         questions = [
             inquirer.Checkbox(
                 "selected_presets", message="Select presets to export", choices=choices
@@ -431,7 +429,7 @@ def export_presets() -> None:
 
         selected_presets = [
             preset
-            for preset in presets
+            for preset in presets[1]
             if f"{preset[1]} (ID: {preset[0]})" in answers["selected_presets"]
         ]
 
@@ -474,10 +472,11 @@ def delete_presets() -> None:
 
     if delete_source == "Select from list":
         all_presets = get_presets_list(
-            show_defaults=False, show_all=True, show_project=False
+            show_defaults=False, show_all=False, show_project=False
         )
+
         # TODO: Refactor ...
-        choices = [f"{preset[1]} (ID: {preset[0]})" for preset in all_presets]
+        choices = [f"{preset[1]} (ID: {preset[0]})" for preset in all_presets[1]]
         questions = [
             inquirer.Checkbox(
                 "selected_presets", message="Select presets to delete", choices=choices
@@ -537,7 +536,7 @@ def delete_presets() -> None:
         return
 
     # Confirmation
-    preset_names = ", ".join([preset[1] for preset in presets_to_delete])
+    preset_names = ", ".join([preset[1] for preset in presets_to_delete[1]])
     confirm = inquirer.confirm(
         f"Are you sure you want to delete the following presets: {preset_names}? This action is irreversible."
     )
@@ -553,7 +552,7 @@ def delete_presets() -> None:
     try:
         with db:
             # This automatically manages transactions
-            for preset in presets_to_delete:
+            for preset in presets_to_delete[1]:
                 db.execute("DELETE FROM style_presets WHERE id = ?", [preset[0]])
         console.print(
             f"[green]Successfully deleted {len(presets_to_delete)} presets.[/green]"

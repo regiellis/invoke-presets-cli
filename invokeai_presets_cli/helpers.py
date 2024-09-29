@@ -1,5 +1,8 @@
+import os
 import typer
 import random
+
+import tempfile
 
 from typing import Dict, Any
 from rich.console import Console
@@ -9,9 +12,9 @@ console = Console(soft_wrap=True)
 
 __all__ = ["feedback_message", "create_table", "add_rows_to_table", "random_name"]
 
+
+
 # function that creates random names and rturns them
-
-
 def random_name(num_words: int = 2, separator: str = "_") -> str:
     adjectives = [
         "happy",
